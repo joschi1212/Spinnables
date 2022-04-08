@@ -34,3 +34,5 @@ install all requirements with the requirements.txt in the root directory
 
 `$ pip install -r requirements`
 
+As python interpreter use the Python.exe in /venv3.9/Scripts/Python.exe
+
