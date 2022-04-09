@@ -4,6 +4,9 @@ Open3d only works with python 3.9 therefore ->
 Download Python 3.9 and install
 https://www.python.org/downloads/release/python-3912/
 
+clone repo
+
+open git bash console in root directory
 check if you really use python 3.9
 
 `$ python --version`
@@ -12,7 +15,6 @@ use python 3.9 and install virtualenv with
 
 `$ pip install virtualenv`
 
-open git bash console in root directory
 Use python 3.9 and virtualenv to create virtual environment for python inside root directory
 
 `$ python -m virtualenv -p python3.9 venv3.9`
@@ -32,7 +34,7 @@ install all requirements with the requirements.txt in the root directory
 
 `$ cd ../../`
 
-`$ pip install -r requirements`
+`$ pip install -r requirements.txt`
 
 As python interpreter use the Python.exe in /venv3.9/Scripts/Python.exe
 
