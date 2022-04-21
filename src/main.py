@@ -4,6 +4,7 @@ import sys
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
+import numpy as np
 
 print("Spinnables Project")
 print("python version", sys.version)
@@ -19,6 +20,8 @@ class WindowApp:
         # member variables
         self.model_dir = ""
         self.model_name = ""
+        self.show_wireframe = False
+        self.my_mesh = None
 
         # Rather than specifying sizes in pixels, which may vary in size based
         # on the monitor, especially on macOS which has 220 dpi monitors, use
@@ -33,11 +36,9 @@ class WindowApp:
 
         self._widget3d.frame = gui.Rect(500, w.content_rect.y,
                                    900, w.content_rect.height)
-        mesh = o3d.geometry.TriangleMesh.create_sphere()
-        mesh.compute_vertex_normals()
-        material = rendering.MaterialRecord()
-        material.shader = "defaultLit"
-        self._widget3d.scene.add_geometry('mesh', mesh, material)
+        self.my_mesh = o3d.geometry.TriangleMesh.create_sphere()
+        self.my_mesh.compute_vertex_normals()
+        self.render_mesh(self.my_mesh)
         self._widget3d.scene.set_background([200, 0, 0, 200]) # not working?!
         self._widget3d.scene.camera.look_at([0, 0, 0], [1, 1, 1], [0, 0, 1])
         self._widget3d.set_on_mouse(self._on_mouse_widget3d)
@@ -69,8 +70,36 @@ class WindowApp:
         # add to the top-level (vertical) layout
         gui_layout.add_child(fileedit_layout)
 
+        # Wireframe Checkbox
+        wireframe_check = gui.Checkbox("Show Wireframe")
+        wireframe_check.set_on_checked(self._on_show_wireframe)
+        gui_layout.add_child(wireframe_check)
+
+        # Calculate Hull
+        hull_button = gui.Button("Construct Hull")
+        hull_button.set_on_clicked(self._on_construct_hull)
+        gui_layout.add_child(hull_button)
+
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
+
+
+    def _on_show_wireframe(self, show):
+        self.show_wireframe = show
+        if(show):
+            wireframe = o3d.geometry.LineSet.create_from_triangle_mesh(self.my_mesh)
+            self.render_mesh(wireframe)
+        if(not show):
+            self.render_mesh(self.my_mesh)
+
+    def _on_construct_hull(self):
+        # trans_vec = np.array([-0.1, -0.1, -0.1])
+        # inside_mesh = self.my_mesh.translate(trans_vec, relative=False)
+        # hull construction currently done with scaling, due to lack of effort...
+        center_vec = np.array([0.0, 0.0, 0.0])
+        inside_mesh = self.my_mesh.scale(scale=0.9, center=center_vec)
+        self.render_mesh(inside_mesh, name="__inner__", clear=False)
+
 
 
     def _on_mouse_widget3d(self, event):
@@ -89,19 +118,28 @@ class WindowApp:
     def _on_filedlg_cancel(self):
         self.window.close_dialog()
 
+    def render_mesh(self, mesh, name="__model__", clear=True):
+        if(clear):
+            self._widget3d.scene.clear_geometry()
+        mesh.paint_uniform_color([1, 0, 0])
+        material = rendering.MaterialRecord()
+        material.shader = "defaultLit"
+        self._widget3d.scene.add_geometry(name, mesh, material)
+        self._widget3d.scene.camera.look_at([0, 0, 0], [1, 1, 1], [0, 0, 1])
+
     def _on_filedlg_done(self, path):
         self._fileedit.text_value = path
         self.model_dir = os.path.normpath(path)
         # load model
-        self._widget3d.scene.clear_geometry()
-        mesh = o3d.io.read_triangle_mesh(path)
-        mesh.compute_vertex_normals()
-        mesh.paint_uniform_color([1, 0, 0])
+        self.my_mesh = o3d.io.read_triangle_mesh(path)
+        self.my_mesh.compute_vertex_normals()
+        self.render_mesh(self.my_mesh)
+        self._on_show_wireframe(self.show_wireframe)
         self.window.close_dialog()
-        material = rendering.MaterialRecord()
-        material.shader = "defaultLit"
-        self._widget3d.scene.add_geometry("__model__", mesh, material)
-        self._widget3d.scene.camera.look_at([0, 0, 0], [1, 1, 1], [0, 0, 1])
+
+
+
+
 
 
 def main():
