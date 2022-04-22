@@ -1,5 +1,6 @@
 import os.path
 import sys
+import copy
 
 import open3d as o3d
 import open3d.visualization.gui as gui
@@ -15,14 +16,70 @@ class WindowApp:
 
     def __init__(self):
         self.window = gui.Application.instance.create_window("Spinnables", 1400, 900)
-        w = self.window
 
         # member variables
         self.model_dir = ""
         self.model_name = ""
         self.show_wireframe = False
-        self.my_mesh = None
+        self.outer_mesh = None
+        self.inner_mesh = None
 
+        self.setup_gui(self.window)
+
+    def _on_show_wireframe(self, show):  # show is current checkbox value
+        self.show_wireframe = show  # save current checkbox value
+        if(show):
+            wireframe = o3d.geometry.LineSet.create_from_triangle_mesh(self.outer_mesh)  # create wireframe from mesh
+            self.render_mesh(wireframe)  # render wireframe mesh and clear other stuff
+            if(self.inner_mesh):  # if an inner_mesh exist render inner mesh without clearing other stuff
+                self.render_mesh(self.inner_mesh, name="__inner__", clear=False)
+        if(not show):  # if show is false render normal mesh
+            self.render_mesh(self.outer_mesh)
+
+    def _on_construct_hull(self):
+        # trans_vec = np.array([-0.1, -0.1, -0.1])
+        # inside_mesh = self.outer_mesh.translate(trans_vec, relative=False)
+        # hull construction currently done with scaling, due to lack of effort...
+        center_vec = np.array([0.0, 0.0, 0.0])
+        self.inner_mesh = copy.deepcopy(self.outer_mesh)  # make copy of mesh and scale it down
+        self.inner_mesh = self.inner_mesh.scale(scale=0.9, center=center_vec)
+        self.render_mesh(self.inner_mesh, name="__inner__", clear=False)
+
+    def _on_mouse_widget3d(self, event):
+        # print(event.type)
+        return gui.Widget.EventCallbackResult.IGNORED
+
+    def _on_filedlg_button(self):
+        filedlg = gui.FileDialog(gui.FileDialog.OPEN, "Select file",
+                                 self.window.theme)
+        filedlg.add_filter(".obj .ply .stl", "Triangle mesh (.obj, .ply, .stl)")
+        filedlg.add_filter("", "All files")
+        filedlg.set_on_cancel(self._on_filedlg_cancel)
+        filedlg.set_on_done(self._on_filedlg_done)
+        self.window.show_dialog(filedlg)
+
+    def _on_filedlg_cancel(self):
+        self.window.close_dialog()
+
+    def render_mesh(self, mesh, name="__outer__", clear=True):
+        if(clear):
+            self._widget3d.scene.clear_geometry()
+        mesh.paint_uniform_color([1, 0, 0])
+        material = rendering.MaterialRecord()
+        material.shader = "defaultLit"
+        self._widget3d.scene.add_geometry(name, mesh, material)
+
+    def _on_filedlg_done(self, path):
+        self._fileedit.text_value = path
+        self.model_dir = os.path.normpath(path)
+        # load model
+        self.outer_mesh = o3d.io.read_triangle_mesh(path)
+        self.outer_mesh.compute_vertex_normals()
+        self.render_mesh(self.outer_mesh)
+        self._on_show_wireframe(self.show_wireframe)
+        self.window.close_dialog()
+
+    def setup_gui(self, w):
         # Rather than specifying sizes in pixels, which may vary in size based
         # on the monitor, especially on macOS which has 220 dpi monitors, use
         # the em-size. This way sizings will be proportional to the font size,
@@ -36,9 +93,9 @@ class WindowApp:
 
         self._widget3d.frame = gui.Rect(500, w.content_rect.y,
                                    900, w.content_rect.height)
-        self.my_mesh = o3d.geometry.TriangleMesh.create_sphere()
-        self.my_mesh.compute_vertex_normals()
-        self.render_mesh(self.my_mesh)
+        self.outer_mesh = o3d.geometry.TriangleMesh.create_sphere()
+        self.outer_mesh.compute_vertex_normals()
+        self.render_mesh(self.outer_mesh)
         self._widget3d.scene.set_background([200, 0, 0, 200]) # not working?!
         self._widget3d.scene.camera.look_at([0, 0, 0], [1, 1, 1], [0, 0, 1])
         self._widget3d.set_on_mouse(self._on_mouse_widget3d)
@@ -71,76 +128,21 @@ class WindowApp:
         gui_layout.add_child(fileedit_layout)
 
         # Wireframe Checkbox
+        wireframe_check_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         wireframe_check = gui.Checkbox("Show Wireframe")
         wireframe_check.set_on_checked(self._on_show_wireframe)
-        gui_layout.add_child(wireframe_check)
+        wireframe_check_gui.add_child(wireframe_check)
+        gui_layout.add_child(wireframe_check_gui)
 
         # Calculate Hull
+        hull_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         hull_button = gui.Button("Construct Hull")
         hull_button.set_on_clicked(self._on_construct_hull)
-        gui_layout.add_child(hull_button)
+        hull_button_gui.add_child(hull_button)
+        gui_layout.add_child(hull_button_gui)
 
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
-
-
-    def _on_show_wireframe(self, show):
-        self.show_wireframe = show
-        if(show):
-            wireframe = o3d.geometry.LineSet.create_from_triangle_mesh(self.my_mesh)
-            self.render_mesh(wireframe)
-        if(not show):
-            self.render_mesh(self.my_mesh)
-
-    def _on_construct_hull(self):
-        # trans_vec = np.array([-0.1, -0.1, -0.1])
-        # inside_mesh = self.my_mesh.translate(trans_vec, relative=False)
-        # hull construction currently done with scaling, due to lack of effort...
-        center_vec = np.array([0.0, 0.0, 0.0])
-        inside_mesh = self.my_mesh.scale(scale=0.9, center=center_vec)
-        self.render_mesh(inside_mesh, name="__inner__", clear=False)
-
-
-
-    def _on_mouse_widget3d(self, event):
-        # print(event.type)
-        return gui.Widget.EventCallbackResult.IGNORED
-
-    def _on_filedlg_button(self):
-        filedlg = gui.FileDialog(gui.FileDialog.OPEN, "Select file",
-                                 self.window.theme)
-        filedlg.add_filter(".obj .ply .stl", "Triangle mesh (.obj, .ply, .stl)")
-        filedlg.add_filter("", "All files")
-        filedlg.set_on_cancel(self._on_filedlg_cancel)
-        filedlg.set_on_done(self._on_filedlg_done)
-        self.window.show_dialog(filedlg)
-
-    def _on_filedlg_cancel(self):
-        self.window.close_dialog()
-
-    def render_mesh(self, mesh, name="__model__", clear=True):
-        if(clear):
-            self._widget3d.scene.clear_geometry()
-        mesh.paint_uniform_color([1, 0, 0])
-        material = rendering.MaterialRecord()
-        material.shader = "defaultLit"
-        self._widget3d.scene.add_geometry(name, mesh, material)
-        self._widget3d.scene.camera.look_at([0, 0, 0], [1, 1, 1], [0, 0, 1])
-
-    def _on_filedlg_done(self, path):
-        self._fileedit.text_value = path
-        self.model_dir = os.path.normpath(path)
-        # load model
-        self.my_mesh = o3d.io.read_triangle_mesh(path)
-        self.my_mesh.compute_vertex_normals()
-        self.render_mesh(self.my_mesh)
-        self._on_show_wireframe(self.show_wireframe)
-        self.window.close_dialog()
-
-
-
-
-
 
 def main():
     gui.Application.instance.initialize()
