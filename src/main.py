@@ -45,6 +45,16 @@ class WindowApp:
         self.inner_mesh = self.inner_mesh.scale(scale=0.9, center=center_vec)
         self.render_mesh(self.inner_mesh, name="__inner__", clear=False)
 
+    def _on_construct_grid(self):
+        print('sheeeesh')
+        grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(self.outer_mesh, 0.1)
+        print(grid)
+        self._widget3d.scene.clear_geometry()
+        material = rendering.MaterialRecord()
+        material.shader = "defaultLit"
+        self._widget3d.scene.add_geometry("grid", grid, material)
+        self._check_grid_inclusion(grid)
+
     def _on_mouse_widget3d(self, event):
         # print(event.type)
         return gui.Widget.EventCallbackResult.IGNORED
@@ -140,6 +150,13 @@ class WindowApp:
         hull_button.set_on_clicked(self._on_construct_hull)
         hull_button_gui.add_child(hull_button)
         gui_layout.add_child(hull_button_gui)
+
+        # Place Grid
+        grid_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        grid_button = gui.Button("Construct Grid")
+        grid_button.set_on_clicked(self._on_construct_grid)
+        grid_button_gui.add_child(grid_button)
+        gui_layout.add_child(grid_button_gui)
 
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
