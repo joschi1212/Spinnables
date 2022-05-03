@@ -2,6 +2,7 @@ import os.path
 import sys
 import copy
 
+import numpy as numpy
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
@@ -46,14 +47,54 @@ class WindowApp:
         self.render_mesh(self.inner_mesh, name="__inner__", clear=False)
 
     def _on_construct_grid(self):
-        print('sheeeesh')
+        print('construct grid')
         grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(self.outer_mesh, 0.1)
         print(grid)
+        print(grid.get_voxels())
+        print(grid.get_voxel_center_coordinate([1,1,1]))
         self._widget3d.scene.clear_geometry()
         material = rendering.MaterialRecord()
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry("grid", grid, material)
-        self._check_grid_inclusion(grid)
+        self._is_voxel_inside(grid,[10,10,11])
+
+
+    def _is_voxel_inside(self, grid, voxel):
+        print('is voxel inside?')
+        bounding_points = grid.get_voxel_bounding_points(voxel)
+        bounding_cloud = o3d.geometry.PointCloud()
+        bounding_cloud.points = bounding_points
+
+        #outside_points = o3d.utility.Vector3dVector([[100,1,1]])
+        #outside_cloud = o3d.geometry.PointCloud()
+        #outside_cloud.points = outside_points
+        print('bounds: ' + str(numpy.asarray(bounding_points)))
+        print('bounds 1: ' + str(numpy.asarray(bounding_cloud.points[1][0])))
+        #rays = o3d.geometry.LineSet.create_from_point_cloud_correspondences(bounding_cloud, outside_cloud,[[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]])
+
+        scene = o3d.t.geometry.RaycastingScene()
+        mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
+        mesh_id = scene.add_triangles(mesh)
+        for x in range(len(bounding_cloud.points)):
+            rays = o3d.core.Tensor([
+                [numpy.asarray(bounding_cloud.points[x][0]),
+                 numpy.asarray(bounding_cloud.points[x][1]),
+                 numpy.asarray(bounding_cloud.points[x][2]),
+                               1, 1, 1]
+            ],
+                dtype=o3d.core.Dtype.Float32)
+            ans = scene.cast_rays(rays)
+            print('ray info: ' + str(rays))
+            intersection_counts = scene.count_intersections(rays).numpy()
+            is_inside = intersection_counts % 2 == 1
+            print('Bound ' + str(x) + ' intersects ' + str(intersection_counts) + ' times!')
+            if not is_inside:
+                print('outside')
+                break
+        print(ans)
+        print('counted intersections: ' + str(intersection_counts))
+        print('inside: ' + str(is_inside))
+
 
     def _on_mouse_widget3d(self, event):
         # print(event.type)
