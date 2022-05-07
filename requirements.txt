@@ -55,7 +55,7 @@ nest-asyncio==1.5.4
 notebook==6.4.10
 notebook-shim==0.1.0
 numpy==1.19.5
-open3d==0.15.1
+open3d
 packaging==21.3
 pandocfilters==1.5.0
 param==1.12.1
