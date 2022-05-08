@@ -107,7 +107,7 @@ class WindowApp:
     # # and length is the dimension of the cell
     def create_grid(self):
         # l = length
-        l = 0.1
+        l = 0.25
         inside_voxels = []
         grid_voxels = []
         print('generate mesh bb')
@@ -201,7 +201,7 @@ class WindowApp:
     def draw_voxels(self, cells):
         if(not len(cells)):
             return
-        l = 0.1
+        l = 0.25
         v0 = 0
         v1 = 1
         v2 = 2
@@ -246,7 +246,7 @@ class WindowApp:
         
         #import pdb
         #pdb.set_trace() 
-        self.render_mesh(lns)
+        self.render_voxels(lns)
 
 
 
@@ -314,11 +314,14 @@ class WindowApp:
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
 
-    def render_voxel(self, mesh, name="__outer__"):
-        mesh.paint_uniform_color([1, 0, 0])
+    def render_voxels(self, mesh, name="__grid__"):
+        self._widget3d.scene.clear_geometry()
+        mesh.paint_uniform_color([0,0,0])
         material = rendering.MaterialRecord()
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
+        #import pdb
+        #pdb.set_trace()
 
     def _on_filedlg_done(self, path):
         self._fileedit.text_value = path
