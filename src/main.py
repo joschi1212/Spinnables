@@ -25,6 +25,9 @@ class WindowApp:
         self.outer_mesh = None
         self.wireframe_outer_mesh = None
         self.inner_mesh = None
+        self.inner_voxels = None
+        self.inner_mesh_inertia = 0
+        self.l = 0.25 # side length of single voxel.
 
         self.setup_gui(self.window)
 
@@ -91,11 +94,41 @@ class WindowApp:
             return 1
 
 
-    # the grid will be a list of tuples (c, length), where c is the center point xyz
-    # # and length is the dimension of the cell
-    def create_grid(self):
-        # l = length
-        l = 0.25
+    def calc_inertia(self, voxels, mass=0.1, l=0.25, CoM=[0,0,0]):
+        """
+        Calculates the moment of inertia for all voxels with respect to the up z axis [0, 0, 1]
+        Arguments:
+            voxels: List of 3D coordinates which represent the voxels center.
+            mass: Float - Mass of a single voxel, defaults to 0.1.
+            CoM: 3D coordinate - The center of mass of the object, defaults to coordinate origin
+        """
+
+        # calculate inertia of a single voxel in respect to its own axis:
+        voxel_inertia = 1.0/6.0 * mass * (l * l)
+
+        I = 0 # Inertia of the whole system
+
+        for center in voxels:
+            d = center[0] - CoM[0] # The perpendicular distance between the voxel's z axis and the system's z axis
+            # is exactly the x coordinate of the voxel center and the x coordinate of the Center of Mass
+            I += voxel_inertia + mass*(d*d)
+        self.inner_mesh_inertia = I
+        print("Inertia of the system is: ", self.inner_mesh_inertia)
+
+
+
+
+
+    def create_grid(self, l=0.25):
+        """
+        Creates a grid, which is a list of 3D coordinates representing the center of a cell.
+        Also performs a inside test via rayshooting technique that checks for each cell if it is entirely inside
+        the inner mesh.
+        The inner cells (list of 3D coordinates) are saved as member variable for later use and are then rendered.
+        Arguments:
+            l: The side length of the voxel
+        """
+
         inside_voxels = []
         grid_voxels = []
         print('generate mesh bb')
@@ -154,39 +187,23 @@ class WindowApp:
             x += l
 
         # self.draw_voxels(grid_voxels)
-        self.draw_voxels(inside_voxels)
-        
+        self.inner_voxels = inside_voxels
+        self.calc_inertia(self.inner_voxels, l=l)
+        self.draw_voxels(self.inner_voxels)
+        print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
 
-    def draw_voxel(self, center):
-        x, y, z = center
-        print(x, y, z, "coords")
-        l = 1
-        points = np.zeros(3)
-        for dx in [-l/2, l/2]:
-            for dy in [-l/2, l/2]:
-                for dz in [-l/2, l/2]:
-                    vert = np.array([x+dx, y+dy, z+dz])
-                    points = np.vstack([points,vert])
-                    print(vert)
-        points = points[1:]
-         
-        # lines_matr = np.array([[1,2], [1,3], [1,5], [2,4], [2,6], [3,4], [3,7], [4,8], [5,6], [5,7], [6,8], [7,8]])
-        lines_matr = np.array([[0,1], [0,2], [0,4], [1,3], [1,5], [2,3], [2,6], [3,7], [4,5], [4,6], [5,7], [6,7]])
-        lns = o3d.geometry.LineSet()
-        lns.points = o3d.cpu.pybind.utility.Vector3dVector(points)
-        lns.lines = o3d.cpu.pybind.utility.Vector2iVector(lines_matr)
-        print(lns, 'lns')
-        
-        #import pdb
-        #pdb.set_trace() 
-        self.render_mesh(lns)
 
-    def draw_voxels(self, cells):
+    def draw_voxels(self, cells, l=0.25):
+        """
+        Creates a lineset representing voxels and renders it as mesh.
+        Arguments:
+            cells: A list of 3D coordinates representing the voxels's center
+            l: The side length of a single voxel
+        """
         if(not len(cells)):
             return
-        l = 0.25
         v0 = 0
         v1 = 1
         v2 = 2
@@ -263,6 +280,9 @@ class WindowApp:
         material = rendering.MaterialRecord()
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
+        # render coordinate frame
+        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=self.inner_mesh_inertia)
+        self._widget3d.scene.add_geometry("__frame__", coordinate_frame, material)
         #import pdb
         #pdb.set_trace()
 
@@ -277,6 +297,12 @@ class WindowApp:
         self.render_mesh(self.outer_mesh)
         self._on_show_wireframe(self.show_wireframe)
         self.window.close_dialog()
+
+    def _on_voxel_size_changed(self, new_size):
+        self.l = float(new_size)
+
+    def _on_create_grid(self):
+        self.create_grid(self.l)
 
     def setup_gui(self, w):
         em = w.theme.font_size
@@ -329,19 +355,18 @@ class WindowApp:
         gui_layout.add_child(construct_inner_button_gui)
 
         #  Place Custom Grid
-        grid_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        grid_button_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        grid_button_text_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         grid_button = gui.Button("Construct Grid")
-        grid_button.set_on_clicked(self.create_grid)
+        grid_button.set_on_clicked(self._on_create_grid)
+        grid_text_edit = gui.TextEdit()
+        grid_text_edit.set_on_value_changed(self._on_voxel_size_changed)
+        grid_text_edit.placeholder_text = "0.25"
+        grid_button_text_gui.add_child(gui.Label("Cell size:"))
+        grid_button_text_gui.add_child(grid_text_edit)
+        grid_button_gui.add_child(grid_button_text_gui)
         grid_button_gui.add_child(grid_button)
         gui_layout.add_child(grid_button_gui)
-
-        # Mesh Bounding Box
-        # Place Grid
-        bb_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
-        bb_button = gui.Button("Construct BBox")
-        bb_button.set_on_clicked(self._bd_box_min_max)
-        bb_button_gui.add_child(bb_button)
-        gui_layout.add_child(bb_button_gui)
 
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
