@@ -23,6 +23,7 @@ class WindowApp:
         self.model_name = ""
         self.show_wireframe = False
         self.outer_mesh = None
+        self.wireframe_outer_mesh = None
         self.inner_mesh = None
 
         self.setup_gui(self.window)
@@ -30,37 +31,24 @@ class WindowApp:
     def _on_show_wireframe(self, show):  # show is current checkbox value
         self.show_wireframe = show  # save current checkbox value
         if(show):
-            wireframe = o3d.geometry.LineSet.create_from_triangle_mesh(self.outer_mesh)  # create wireframe from mesh
-            self.render_mesh(wireframe)  # render wireframe mesh and clear other stuff
+            self.wireframe_outer_mesh = o3d.geometry.LineSet.create_from_triangle_mesh(self.outer_mesh)  # create wireframe from mesh
+
+            self.render_mesh(self.wireframe_outer_mesh)  # render wireframe mesh and clear other stuff
             if(self.inner_mesh):  # if an inner_mesh exist render inner mesh without clearing other stuff
                 self.render_mesh(self.inner_mesh, name="__inner__", clear=False)
         if(not show):  # if show is false render normal mesh
             self.render_mesh(self.outer_mesh)
 
-    def _on_construct_hull(self):
+    def _on_construct_inner_mesh(self):
         # trans_vec = np.array([-0.1, -0.1, -0.1])
         # inside_mesh = self.outer_mesh.translate(trans_vec, relative=False)
         # hull construction currently done with scaling, due to lack of effort...
         center_vec = np.array([0.0, 0.0, 0.0])
         self.inner_mesh = copy.deepcopy(self.outer_mesh)  # make copy of mesh and scale it down
         self.inner_mesh = self.inner_mesh.scale(scale=0.9, center=center_vec)
-        inner_wireframe = o3d.geometry.LineSet.create_from_triangle_mesh(self.inner_mesh)  # create wireframe from mesh
-        self.render_mesh(inner_wireframe)
-        # self.render_mesh(self.inner_mesh, name="__inner__", clear=False)
-
-    #def _on_construct_grid(self):
-    #    print('construct grid')
-    #    grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(self.outer_mesh, 0.1)
-    #    print(grid)
-    #    print(grid.get_voxels())
-    #    print(grid.get_voxel_center_coordinate([1,1,1]))
-    #    self._widget3d.scene.clear_geometry()
-    #    material = rendering.MaterialRecord()
-    #    material.shader = "defaultLit"
-    #    self._widget3d.scene.add_geometry("grid", grid, material)
-    #    self._is_voxel_inside(grid,[10,10,11])
-    #    #grid_lines = open3d.geometry.VoxelGrid.LineSet(grid)
-    #    #self.render_mesh(grid_lines)
+        self.render_mesh(self.inner_mesh, name='__inner_mesh__')
+        if(self.show_wireframe):
+            self.render_mesh(self.wireframe_outer_mesh, name='__wireframe_outer__', clear=False)
 
     # returns the min and max diagonal points of the bounding box
     def _bd_box_min_max(self):
@@ -149,7 +137,6 @@ class WindowApp:
                                 if(not(inside)):
                                     cell_inside = 0
                                     break;
-
                     #if(cell_count == 0):
                     #    print(cell_verts)
                     #    print(self.ray_shoot_inside(self.inner_mesh, vert))
@@ -161,8 +148,6 @@ class WindowApp:
                     if(cell_inside):
                         inside_count +=1
                         inside_voxels.append(center)
-
-
                     z += l
                     cell_count +=1
                 y += l
@@ -248,48 +233,6 @@ class WindowApp:
         #pdb.set_trace() 
         self.render_voxels(lns)
 
-
-
-
-
-
-    #def _is_voxel_inside(self, grid, voxel):
-    #    print('is voxel inside?')
-    #    bounding_points = grid.get_voxel_bounding_points(voxel)
-    #    bounding_cloud = o3d.geometry.PointCloud()
-    #    bounding_cloud.points = bounding_points
-
-    #    #outside_points = o3d.utility.Vector3dVector([[100,1,1]])
-    #    #outside_cloud = o3d.geometry.PointCloud()
-    #    #outside_cloud.points = outside_points
-    #    print('bounds: ' + str(numpy.asarray(bounding_points)))
-    #    print('bounds 1: ' + str(numpy.asarray(bounding_cloud.points[1][0])))
-    #    #rays = o3d.geometry.LineSet.create_from_point_cloud_correspondences(bounding_cloud, outside_cloud,[[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]])
-
-    #    scene = o3d.t.geometry.RaycastingScene()
-    #    mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
-    #    mesh_id = scene.add_triangles(mesh)
-    #    for x in range(len(bounding_cloud.points)):
-    #        rays = o3d.core.Tensor([
-    #            [numpy.asarray(bounding_cloud.points[x][0]),
-    #             numpy.asarray(bounding_cloud.points[x][1]),
-    #             numpy.asarray(bounding_cloud.points[x][2]),
-    #                           1, 1, 1]
-    #        ],
-    #            dtype=o3d.core.Dtype.Float32)
-    #        ans = scene.cast_rays(rays)
-    #        print('ray info: ' + str(rays))
-    #        intersection_counts = scene.count_intersections(rays).numpy()
-    #        is_inside = intersection_counts % 2 == 1
-    #        print('Bound ' + str(x) + ' intersects ' + str(intersection_counts) + ' times!')
-    #        if not is_inside:
-    #            print('outside')
-    #            break
-    #    print(ans)
-    #    print('counted intersections: ' + str(intersection_counts))
-    #    print('inside: ' + str(is_inside))
-
-
     def _on_mouse_widget3d(self, event):
         # print(event.type)
         return gui.Widget.EventCallbackResult.IGNORED
@@ -329,15 +272,13 @@ class WindowApp:
         # load model
         self.outer_mesh = o3d.io.read_triangle_mesh(path)
         self.outer_mesh.compute_vertex_normals()
+        self.inner_mesh = None
+        self.wireframe_outer_mesh = None
         self.render_mesh(self.outer_mesh)
         self._on_show_wireframe(self.show_wireframe)
         self.window.close_dialog()
 
     def setup_gui(self, w):
-        # Rather than specifying sizes in pixels, which may vary in size based
-        # on the monitor, especially on macOS which has 220 dpi monitors, use
-        # the em-size. This way sizings will be proportional to the font size,
-        # which will create a more visually consistent size across platforms.
         em = w.theme.font_size
 
         # 3D Widget
@@ -359,20 +300,12 @@ class WindowApp:
         gui_layout.frame = gui.Rect(w.content_rect.x, w.content_rect.y,
                                    500, w.content_rect.height)
         # File-chooser widget
-        # Widgets are laid out in layouts: gui.Horiz, gui.Vert,
-        # gui.CollapsableVert, and gui.VGrid. By nesting the layouts we can
-        # achieve complex designs. Usually we use a vertical layout as the
-        # topmost widget, since widgets tend to be organized from top to bottom.
-        # Within that, we usually have a series of horizontal layouts for each
-        # row.
         self._fileedit = gui.TextEdit()
         filedlgbutton = gui.Button("...")
         filedlgbutton.horizontal_padding_em = 0.5
         filedlgbutton.vertical_padding_em = 0
         filedlgbutton.set_on_clicked(self._on_filedlg_button)
 
-        # (Create the horizontal widget for the row. This will make sure the
-        # text editor takes up as much space as it can.)
         fileedit_layout = gui.Horiz()
         fileedit_layout.add_child(gui.Label("Model file"))
         fileedit_layout.add_child(self._fileedit)
@@ -388,19 +321,12 @@ class WindowApp:
         wireframe_check_gui.add_child(wireframe_check)
         gui_layout.add_child(wireframe_check_gui)
 
-        # Calculate Hull
-        hull_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
-        hull_button = gui.Button("Construct Hull")
-        hull_button.set_on_clicked(self._on_construct_hull)
-        hull_button_gui.add_child(hull_button)
-        gui_layout.add_child(hull_button_gui)
-
-        # Place Grid
-        #grid_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
-        #grid_button = gui.Button("Construct Grid")
-        #grid_button.set_on_clicked(self._on_construct_grid)
-        #grid_button_gui.add_child(grid_button)
-        #gui_layout.add_child(grid_button_gui)
+        # Construct inner mesh
+        construct_inner_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        construct_inner_button = gui.Button("Construct Inner Mesh")
+        construct_inner_button.set_on_clicked(self._on_construct_inner_mesh)
+        construct_inner_button_gui.add_child(construct_inner_button)
+        gui_layout.add_child(construct_inner_button_gui)
 
         #  Place Custom Grid
         grid_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
