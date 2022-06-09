@@ -95,6 +95,7 @@ class WindowApp:
 
 
     def calc_inertia(self, voxels, mass=0.1, l=0.25, CoM=[0,0,0]):
+        l = self.l
         """
         Calculates the moment of inertia for all voxels with respect to the up z axis [0, 0, 1]
         Arguments:
@@ -109,9 +110,12 @@ class WindowApp:
         I = 0 # Inertia of the whole system
 
         for center in voxels:
-            d = center[0] - CoM[0] # The perpendicular distance between the voxel's z axis and the system's z axis
-            # is exactly the x coordinate of the voxel center and the x coordinate of the Center of Mass
-            I += voxel_inertia + mass*(d*d)
+            # The perpendicular distance between the voxel's z axis and the system's z axis
+            # is the xy distance from the voxel center to the CoM
+            x_diff = center[0] - CoM[0] 
+            y_diff = center[1] - CoM[1]
+            d_sq = x_diff**2 + y_diff**2
+            I += voxel_inertia + mass*d_sq
         self.inner_mesh_inertia = I
         print("Inertia of the system is: ", self.inner_mesh_inertia)
 
@@ -120,6 +124,7 @@ class WindowApp:
 
 
     def create_grid(self, l=0.25):
+        l = self.l
         """
         Creates a grid, which is a list of 3D coordinates representing the center of a cell.
         Also performs a inside test via rayshooting technique that checks for each cell if it is entirely inside
@@ -196,6 +201,7 @@ class WindowApp:
 
 
     def draw_voxels(self, cells, l=0.25):
+        l = self.l
         """
         Creates a lineset representing voxels and renders it as mesh.
         Arguments:
@@ -281,7 +287,8 @@ class WindowApp:
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
         # render coordinate frame
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=self.inner_mesh_inertia)
+        # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=self.inner_mesh_inertia)
+        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3)
         self._widget3d.scene.add_geometry("__frame__", coordinate_frame, material)
         #import pdb
         #pdb.set_trace()
