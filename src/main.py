@@ -26,8 +26,10 @@ class WindowApp:
         self.wireframe_outer_mesh = None
         self.inner_mesh = None
         self.inner_voxels = None
+        self.border_voxels = None
         self.inner_mesh_inertia = 0
-        self.l = 0.25 # side length of single voxel.
+        self.l = 0.25 # side length of single inner voxel.
+        self.border_l = 0.25 #side length of single border voxel.
 
         self.setup_gui(self.window)
 
@@ -48,17 +50,17 @@ class WindowApp:
         # hull construction currently done with scaling, due to lack of effort...
         center_vec = np.array([0.0, 0.0, 0.0])
         self.inner_mesh = copy.deepcopy(self.outer_mesh)  # make copy of mesh and scale it down
-        self.inner_mesh = self.inner_mesh.scale(scale=0.9, center=center_vec)
+        self.inner_mesh = self.inner_mesh.scale(scale=0.5, center=center_vec)
         self.render_mesh(self.inner_mesh, name='__inner_mesh__')
         if(self.show_wireframe):
             self.render_mesh(self.wireframe_outer_mesh, name='__wireframe_outer__', clear=False)
 
     # returns the min and max diagonal points of the bounding box
-    def _bd_box_min_max(self):
+    def _bd_box_min_max(self, mesh):
         #import pdb
         #pdb.set_trace()
         print('generate mesh bb')
-        bd_box = self.inner_mesh.get_axis_aligned_bounding_box()
+        bd_box = self.mesh.get_axis_aligned_bounding_box()
         print("worked")
         box_pts = bd_box.get_box_points()
         #import pdb
@@ -76,7 +78,7 @@ class WindowApp:
 
     def ray_shoot_inside(self, mesh, point_coords):
         scene = o3d.t.geometry.RaycastingScene()
-        mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
+        # mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
         mesh_id = scene.add_triangles(mesh)
         ray_x = 10*(1 + np.random.rand())
         ray_y = 10*(1 + np.random.rand())
@@ -133,7 +135,7 @@ class WindowApp:
         Arguments:
             l: The side length of the voxel
         """
-
+        in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
         inside_voxels = []
         grid_voxels = []
         print('generate mesh bb')
@@ -171,7 +173,7 @@ class WindowApp:
                                 vert = np.array([x+dx, y+dy, z+dz])
                                 cell_verts.append(vert)
                                 # for each cell vertex, check whether it's inside or outside the mesh:
-                                inside = self.ray_shoot_inside(self.inner_mesh, vert)
+                                inside = self.ray_shoot_inside(in_mesh, vert)
                                 if(not(inside)):
                                     cell_inside = 0
                                     break;
@@ -193,15 +195,92 @@ class WindowApp:
 
         # self.draw_voxels(grid_voxels)
         self.inner_voxels = inside_voxels
-        self.calc_inertia(self.inner_voxels, l=l)
-        self.draw_voxels(self.inner_voxels)
-        print("inner voxels: ", self.inner_voxels)
+        # self.calc_inertia(self.inner_voxels, l=l)
+        self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__innerg__")
+        # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
 
+    def create_border_grid(self, l=0.25):
 
-    def draw_voxels(self, cells, l=0.25):
-        l = self.l
+        l = self.border_l
+        out_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.outer_mesh)
+        in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
+        border_voxels = []
+        grid_voxels = []
+        print('generate mesh bb')
+        bd_box = self.outer_mesh.get_axis_aligned_bounding_box()
+        print("worked")
+        box_pts = bd_box.get_box_points()
+        #import pdb
+        #pdb.set_trace()
+        min_pt = bd_box.get_min_bound()
+        max_pt = bd_box.get_max_bound()
+        print('bd_box min, max: ', min_pt, max_pt)
+        
+        x_min, y_min, z_min = min_pt
+        x_max, y_max, z_max = max_pt
+        x = x_min
+        y = y_min
+        z = z_min
+        cell_count = 0
+        border_count = 0
+
+        while(x <= x_max):
+            print(x)
+            #import pdb
+            #pdb.set_trace()
+            y = y_min
+            while(y <= y_max):
+                z = z_min
+                while(z <= z_max):
+                    center = np.array([x,y,z])
+                    # grid_voxels.append(center)
+                    cell_verts = []
+                    cell_border = 1
+                    # generate cell vertices:
+                    for dx in [-l/2, l/2]:
+                        for dy in [-l/2, l/2]:
+                            for dz in [-l/2, l/2]:
+                                vert = np.array([x+dx, y+dy, z+dz])
+                                cell_verts.append(vert)
+                                # for each cell, vertex, check if it's inside the outer mesh:
+                                inside = self.ray_shoot_inside(out_mesh, vert)
+                                if(not(inside)):
+                                    cell_border = 0
+                                    break;
+                                # for each cell vertex, check whether it's outside the inner mesh:
+                                inside = self.ray_shoot_inside(in_mesh, vert)
+                                if(inside):
+                                    cell_border = 0
+                                    break;
+                    #if(cell_count == 0):
+                    #    print(cell_verts)
+                    #    print(self.ray_shoot_inside(self.inner_mesh, vert))
+                        #self.draw_voxel(center)
+                    
+                    #import pdb
+                    #pdb.set_trace()    
+                    grid_voxels.append(center)
+                    if(cell_border):
+                        border_count +=1
+                        border_voxels.append(center)
+                    z += l
+                    cell_count +=1
+                y += l
+            x += l
+
+        # self.draw_voxels(grid_voxels)
+        self.border_voxels = border_voxels
+        # self.calc_inertia(self.inner_voxels, l=l)
+        self.draw_voxels(self.border_voxels, self.border_l, [0,0,0], "__borderg__")
+        # print("inner voxels: ", self.inner_voxels)
+        print("number of grid cells:", cell_count)
+        print("number of BORDER cells:", border_count)
+        return
+
+
+    def draw_voxels(self, cells, l, colr, voxels_name):
         """
         Creates a lineset representing voxels and renders it as mesh.
         Arguments:
@@ -254,7 +333,7 @@ class WindowApp:
         
         #import pdb
         #pdb.set_trace() 
-        self.render_voxels(lns)
+        self.render_voxels(lns, colr, name = voxels_name)
 
     def _on_mouse_widget3d(self, event):
         # print(event.type)
@@ -280,9 +359,9 @@ class WindowApp:
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
 
-    def render_voxels(self, mesh, name="__grid__"):
+    def render_voxels(self, mesh, col, name="__grid__"):
         self._widget3d.scene.clear_geometry()
-        mesh.paint_uniform_color([0,0,0])
+        mesh.paint_uniform_color(col)
         material = rendering.MaterialRecord()
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
@@ -308,8 +387,14 @@ class WindowApp:
     def _on_voxel_size_changed(self, new_size):
         self.l = float(new_size)
 
+    def _on_border_voxel_size_changed(self, new_size):
+        self.border_l = float(new_size)
+
     def _on_create_grid(self):
-        self.create_grid(self.l)
+        self.create_grid()
+
+    def _on_create_border_grid(self):
+        self.create_border_grid()
 
     def setup_gui(self, w):
         em = w.theme.font_size
@@ -364,7 +449,7 @@ class WindowApp:
         #  Place Custom Grid
         grid_button_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         grid_button_text_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
-        grid_button = gui.Button("Construct Grid")
+        grid_button = gui.Button("Construct Inner Grid")
         grid_button.set_on_clicked(self._on_create_grid)
         grid_text_edit = gui.TextEdit()
         grid_text_edit.set_on_value_changed(self._on_voxel_size_changed)
@@ -374,6 +459,20 @@ class WindowApp:
         grid_button_gui.add_child(grid_button_text_gui)
         grid_button_gui.add_child(grid_button)
         gui_layout.add_child(grid_button_gui)
+
+        # Border Grid
+        bgrid_button_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        bgrid_button_text_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        bgrid_button = gui.Button("Construct Border Grid")
+        bgrid_button.set_on_clicked(self._on_create_border_grid)
+        bgrid_text_edit = gui.TextEdit()
+        bgrid_text_edit.set_on_value_changed(self._on_border_voxel_size_changed)
+        bgrid_text_edit.placeholder_text = "0.25"
+        bgrid_button_text_gui.add_child(gui.Label("Border cell size:"))
+        bgrid_button_text_gui.add_child(bgrid_text_edit)
+        bgrid_button_gui.add_child(bgrid_button_text_gui)
+        bgrid_button_gui.add_child(bgrid_button)
+        gui_layout.add_child(bgrid_button_gui)
 
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
