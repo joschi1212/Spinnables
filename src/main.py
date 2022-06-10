@@ -27,6 +27,7 @@ class WindowApp:
         self.inner_mesh = None
         self.inner_voxels = None
         self.border_voxels = None
+        self.grid_lines = None
         self.inner_mesh_inertia = 0
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
@@ -193,10 +194,12 @@ class WindowApp:
                 y += l
             x += l
 
-        # self.draw_voxels(grid_voxels)
+        
         self.inner_voxels = inside_voxels
-        # self.calc_inertia(self.inner_voxels, l=l)
-        self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__innerg__")
+        #import pdb
+        #pdb.set_trace()
+        self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__grid__")
+        # self.calc_inertia(self.inner_voxels, l=l)self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__innerg__")
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
@@ -333,7 +336,10 @@ class WindowApp:
         
         #import pdb
         #pdb.set_trace() 
-        self.render_voxels(lns, colr, name = voxels_name)
+        if(voxels_name == "__borderg__"):
+            self.render_voxels(lns, colr, name = voxels_name, clear = False)
+        else:
+            self.render_voxels(lns, colr, name = voxels_name)
 
     def _on_mouse_widget3d(self, event):
         # print(event.type)
@@ -359,8 +365,9 @@ class WindowApp:
         material.shader = "defaultLit"
         self._widget3d.scene.add_geometry(name, mesh, material)
 
-    def render_voxels(self, mesh, col, name="__grid__"):
-        self._widget3d.scene.clear_geometry()
+    def render_voxels(self, mesh, col, name="__grid__", clear=True):
+        if(clear==True):
+            self._widget3d.scene.clear_geometry()
         mesh.paint_uniform_color(col)
         material = rendering.MaterialRecord()
         material.shader = "defaultLit"
@@ -371,6 +378,24 @@ class WindowApp:
         self._widget3d.scene.add_geometry("__frame__", coordinate_frame, material)
         #import pdb
         #pdb.set_trace()
+
+    #def render_both_grids(self, meshes):
+    #    self._widget3d.scene.clear_geometry()
+    #    meshes[0].paint_uniform_color([1,0,0])
+    #    material = rendering.MaterialRecord()
+    #    material.shader = "defaultLit"
+    #    self._widget3d.scene.add_geometry("__ingrid__", meshes[0], material)
+
+    #    meshes[1].paint_uniform_color([0,0,0])
+    #    material = rendering.MaterialRecord()
+    #    material.shader = "defaultLit"
+    #    self._widget3d.scene.add_geometry("__bgrid__", meshes[1], material)
+    #    # render coordinate frame
+    #    # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=self.inner_mesh_inertia)
+    #    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3)
+    #    self._widget3d.scene.add_geometry("__frame__", coordinate_frame, material)
+    #    #import pdb
+    #    #pdb.set_trace()
 
     def _on_filedlg_done(self, path):
         self._fileedit.text_value = path
