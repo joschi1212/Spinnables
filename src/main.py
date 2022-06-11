@@ -31,7 +31,9 @@ class WindowApp:
         self.border_masses = None
         self.grid_lines = None
         self.CoM = None
-        self.inertia = 0
+        self.inertia_x = 0
+        self.inertia_y = 0
+        self.inertia_z = 0
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
 
@@ -120,15 +122,16 @@ class WindowApp:
 
 
 
-    def calc_inertia(self, voxels, mass, l, CoM=[0,0,0]):
+    def calc_inertia(self, voxels, mass, l, axis, CoM=[0,0,0]):
         """
-        Calculates the moment of inertia for all voxels with respect to the up z axis [0, 0, 1]
+        Calculates the moment of inertia for all voxels with respect to the principle axis
         Arguments:
         :param voxels: np.array of 3D coordinates which represent the voxels center.
         :param mass: 1d np.array -  mass for each voxel
         :param l: array of length for each voxel
         :param CoM: 3D coordinate - The center of mass of the object, defaults to coordinate origin
-        :return: moment of inertia
+        :param axis: normalized 3d np.array of a principle axis - principle axis of the inertia moment
+        :return: moment of inertia for a given axis
         """
 
         I = 0 # Inertia of the whole system
@@ -136,13 +139,14 @@ class WindowApp:
         for index, center in enumerate(voxels):
             # calculate inertia of a single voxel in respect to its own axis:
             voxel_inertia = 1.0 / 6.0 * mass[index] * (l[index] * l[index])
-            # The perpendicular distance between the voxel's z axis and the system's z axis
-            # is the xy distance from the voxel center to the CoM
-            x_diff = center[0] - CoM[0] 
-            y_diff = center[1] - CoM[1]
-            d_sq = x_diff**2 + y_diff**2
+            # The perpendicular distance between the voxel's principle axis and the system's principle axis
+            # is the distance from the voxel center to the CoM
+            axis_inverted = 1-axis # invert principle axis ... e.g. [1, 0, 0] becomes [0, 1, 1]
+            # compute the difference of all axis and then discard the principle axis component
+            # and calculate the norm of the other two axis and square it
+            d_sq = np.linalg.norm((CoM - center) * axis_inverted)**2
             I += voxel_inertia + mass[index]*d_sq
-        print("Inertia of the system is: ", I)
+        print("Inertia of the system around its principle axis ", axis, " is: ", I)
         return I
 
     def create_grid(self, l, mass=0.1):
@@ -305,7 +309,9 @@ class WindowApp:
         self.CoM = self.calc_CoM(all_voxels, all_masses)
         all_lengths = np.append(np.tile(self.l, self.inner_voxels.shape[0]),
                                 np.tile(self.border_l, self.border_voxels.shape[0]))
-        self.inertia = self.calc_inertia(all_voxels, all_masses, all_lengths, self.CoM)
+        self.inertia_x = self.calc_inertia(all_voxels, all_masses, all_lengths, np.array([1, 0, 0]), self.CoM)
+        self.inertia_y = self.calc_inertia(all_voxels, all_masses, all_lengths, np.array([0, 1, 0]), self.CoM)
+        self.inertia_z = self.calc_inertia(all_voxels, all_masses, all_lengths, np.array([0, 0, 1]), self.CoM)
 
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
