@@ -26,9 +26,12 @@ class WindowApp:
         self.wireframe_outer_mesh = None
         self.inner_mesh = None
         self.inner_voxels = None
+        self.inner_masses = None
         self.border_voxels = None
+        self.border_masses = None
         self.grid_lines = None
-        self.inner_mesh_inertia = 0
+        self.CoM = None
+        self.inertia = 0
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
 
@@ -96,45 +99,62 @@ class WindowApp:
         else:
             return 1
 
+    def calc_CoM(self, voxels, masses):
+        """
+        Calculates the center of mass of the given voxels,
+        as every voxel can have a different mass we need a list of masses corresponding to the voxels
+        Arguments:
+        :param voxels: The 3d center of the voxels - a list of 3d Numpy arrays
+        :param masses: The corresponding mass of the voxels - a list of scalars, the same size as voxels
+        :returns CoM np.array
+        """
 
-    def calc_inertia(self, voxels, mass=0.1, l=0.25, CoM=[0,0,0]):
-        l = self.l
+        CoM = np.array([0,0,0])
+        sum_mass = 0
+        for index, center in enumerate(voxels):
+            CoM = np.add(CoM, center * masses[index])
+            sum_mass = sum_mass + masses[index]
+        CoM = CoM / sum_mass
+        print("Center of mass is : ", CoM)
+        return CoM
+
+
+
+    def calc_inertia(self, voxels, mass, l, CoM=[0,0,0]):
         """
         Calculates the moment of inertia for all voxels with respect to the up z axis [0, 0, 1]
         Arguments:
-            voxels: List of 3D coordinates which represent the voxels center.
-            mass: Float - Mass of a single voxel, defaults to 0.1.
-            CoM: 3D coordinate - The center of mass of the object, defaults to coordinate origin
+        :param voxels: np.array of 3D coordinates which represent the voxels center.
+        :param mass: 1d np.array -  mass for each voxel
+        :param l: array of length for each voxel
+        :param CoM: 3D coordinate - The center of mass of the object, defaults to coordinate origin
+        :return: moment of inertia
         """
-
-        # calculate inertia of a single voxel in respect to its own axis:
-        voxel_inertia = 1.0/6.0 * mass * (l * l)
 
         I = 0 # Inertia of the whole system
 
-        for center in voxels:
+        for index, center in enumerate(voxels):
+            # calculate inertia of a single voxel in respect to its own axis:
+            voxel_inertia = 1.0 / 6.0 * mass[index] * (l[index] * l[index])
             # The perpendicular distance between the voxel's z axis and the system's z axis
             # is the xy distance from the voxel center to the CoM
             x_diff = center[0] - CoM[0] 
             y_diff = center[1] - CoM[1]
             d_sq = x_diff**2 + y_diff**2
-            I += voxel_inertia + mass*d_sq
-        self.inner_mesh_inertia = I
-        print("Inertia of the system is: ", self.inner_mesh_inertia)
+            I += voxel_inertia + mass[index]*d_sq
+        print("Inertia of the system is: ", I)
+        return I
 
-
-
-
-
-    def create_grid(self, l=0.25):
-        l = self.l
+    def create_grid(self, l, mass=0.1):
         """
         Creates a grid, which is a list of 3D coordinates representing the center of a cell.
         Also performs a inside test via rayshooting technique that checks for each cell if it is entirely inside
         the inner mesh.
-        The inner cells (list of 3D coordinates) are saved as member variable for later use and are then rendered.
+        The inner cells (3d numpy array) are saved as member variable for later use and are then rendered.
+        Also initializes the mass for each voxel with 1
         Arguments:
             l: The side length of the voxel
+            mass: The mass with which each voxel is initialized
         """
         in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
         inside_voxels = []
@@ -195,18 +215,19 @@ class WindowApp:
             x += l
 
         
-        self.inner_voxels = inside_voxels
+        self.inner_voxels = np.array(inside_voxels)
+        self.inner_masses = np.tile(mass, self.inner_voxels.shape[0]) # create np array with initial mass
         #import pdb
         #pdb.set_trace()
         self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__grid__")
+
         # self.calc_inertia(self.inner_voxels, l=l)self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__innerg__")
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
 
-    def create_border_grid(self, l=0.25):
+    def create_border_grid(self, l, mass=0.1):
 
-        l = self.border_l
         out_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.outer_mesh)
         in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
         border_voxels = []
@@ -274,9 +295,18 @@ class WindowApp:
             x += l
 
         # self.draw_voxels(grid_voxels)
-        self.border_voxels = border_voxels
-        # self.calc_inertia(self.inner_voxels, l=l)
+        self.border_voxels = np.array(border_voxels)
+        self.border_masses = np.tile(mass, self.border_voxels.shape[0]) # create np array with initial mass
         self.draw_voxels(self.border_voxels, self.border_l, [0,0,0], "__borderg__")
+
+        # calc CoM and moment of inertia of both group of voxels
+        all_voxels = np.concatenate((self.inner_voxels, self.border_voxels), axis=0)
+        all_masses = np.append(self.inner_masses, self.border_masses)
+        self.CoM = self.calc_CoM(all_voxels, all_masses)
+        all_lengths = np.append(np.tile(self.l, self.inner_voxels.shape[0]),
+                                np.tile(self.border_l, self.border_voxels.shape[0]))
+        self.inertia = self.calc_inertia(all_voxels, all_masses, all_lengths, self.CoM)
+
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of BORDER cells:", border_count)
@@ -375,6 +405,7 @@ class WindowApp:
         # render coordinate frame
         # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=self.inner_mesh_inertia)
         coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3)
+        # coordinate_frame.translate(self.CoM)
         self._widget3d.scene.add_geometry("__frame__", coordinate_frame, material)
         #import pdb
         #pdb.set_trace()
@@ -416,10 +447,10 @@ class WindowApp:
         self.border_l = float(new_size)
 
     def _on_create_grid(self):
-        self.create_grid()
+        self.create_grid(l=self.l)
 
     def _on_create_border_grid(self):
-        self.create_border_grid()
+        self.create_border_grid(l=self.border_l)
 
     def setup_gui(self, w):
         em = w.theme.font_size
@@ -478,7 +509,7 @@ class WindowApp:
         grid_button.set_on_clicked(self._on_create_grid)
         grid_text_edit = gui.TextEdit()
         grid_text_edit.set_on_value_changed(self._on_voxel_size_changed)
-        grid_text_edit.placeholder_text = "0.25"
+        grid_text_edit.placeholder_text = str(self.l)
         grid_button_text_gui.add_child(gui.Label("Cell size:"))
         grid_button_text_gui.add_child(grid_text_edit)
         grid_button_gui.add_child(grid_button_text_gui)
@@ -492,7 +523,7 @@ class WindowApp:
         bgrid_button.set_on_clicked(self._on_create_border_grid)
         bgrid_text_edit = gui.TextEdit()
         bgrid_text_edit.set_on_value_changed(self._on_border_voxel_size_changed)
-        bgrid_text_edit.placeholder_text = "0.25"
+        bgrid_text_edit.placeholder_text = str(self.border_l)
         bgrid_button_text_gui.add_child(gui.Label("Border cell size:"))
         bgrid_button_text_gui.add_child(bgrid_text_edit)
         bgrid_button_gui.add_child(bgrid_button_text_gui)
