@@ -27,10 +27,30 @@ class WindowApp:
         self.inner_mesh = None
         self.inner_voxels = None
         self.border_voxels = None
-        self.grid_lines = None
         self.inner_mesh_inertia = 0
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
+        self.density = 1
+
+        # inertia volume integrals for voxels:
+        self.x_itgr = None
+        self.y_itgr = None
+        self.z_itgr = None
+        self.xy_itgr = None
+        self.xz_itgr = None
+        self.yz_itgr = None
+        self.x2_itgr = None
+        self.y2_itgr = None
+        self.z2_itgr  = None
+
+        # inertia tensor of border:
+        self.border_com = [0,0,0]
+        self.border_xyz = None
+        self.border_inertia_tensor = None
+
+        # gammas (weights for the center of mass term and the inertia term):
+        self.weight_c = 0.5
+        self.weight_i = 0.5
 
         self.setup_gui(self.window)
 
@@ -122,9 +142,78 @@ class WindowApp:
         self.inner_mesh_inertia = I
         print("Inertia of the system is: ", self.inner_mesh_inertia)
 
+    def calc_vol_integrals(self):
+        l3 = (self.l)**3
+        l5_12 = ((self.l)**5)/12
+        # x, y, z:
+        self.x_itgr = np.array([l3*vox[0] for vox in self.inner_voxels])
+        self.y_itgr = np.array([l3*vox[1] for vox in self.inner_voxels])
+        self.z_itgr = np.array([l3*vox[2] for vox in self.inner_voxels])
+        # xy, xz, yz:
+        self.xy_itgr = np.array([l3*vox[0]*vox[1] for vox in self.inner_voxels])
+        self.xz_itgr = np.array([l3*vox[0]*vox[2] for vox in self.inner_voxels])
+        self.yz_itgr = np.array([l3*vox[1]*vox[2] for vox in self.inner_voxels])
+        # x2, y2, z2:
+        self.x2_itgr = np.array([((vox[0]**2)*l3 + l5_12) for vox in self.inner_voxels])
+        self.y2_itgr = np.array([((vox[1]**2)*l3 + l5_12) for vox in self.inner_voxels])
+        self.z2_itgr = np.array([((vox[2]**2)*l3 + l5_12) for vox in self.inner_voxels])
 
 
+    def calc_border_itensor(self):
+        self.border_xyz = np.zeros(3)
+        self.border_inertia_tensor = np.zeros((3,3))
+        bl3 = (self.border_l)**3
+        bl5_12 = ((self.border_l)**5)/12
+        for b_vox in self.border_voxels:
+            bx = vox[0]
+            by = vox[1]
+            bz = vox[2]
+            # x, y, z:
+            self.border_xyz[0] += bl3*bx
+            self.border_xyz[1] += bl3*by
+            self.border_xyz[2] += bl3*bz
+            # xy, xz, yz:
+            self.border_inertia_tensor[0][1] -= bl3*bx*by
+            self.border_inertia_tensor[0][2] -= bl3*bx*bz
+            self.border_inertia_tensor[1][2] -= bl3*by*bz
+            # x2, y2, z2:
+            self.border_inertia_tensor[0][0] += bl3*(bz**2 + by**2) + 2*bl5_12
+            self.border_inertia_tensor[1][1] += bl3*(bx**2 + bz**2) + 2*bl5_12
+            self.border_inertia_tensor[2][2] += bl3*(bx**2 + by**2) + 2*bl5_12
 
+        # update the symmetric xy, xz, yz terms:
+        self.border_inertia_tensor[1][0] = self.border_inertia_tensor[0][1]
+        self.border_inertia_tensor[2][0] = self.border_inertia_tensor[0][2]
+        self.border_inertia_tensor[2][1] = self.border_inertia_tensor[1][2]
+    
+    # returns mass, z_com, and full inertia tensor:
+    def calc_full_itensor(densities):
+        mass_total = np.sum(densities)
+        diag110 = np.array([[1,0,0], [0,1,0], [0,0,0]])
+        # get s_z = s_z border + s_z inner vox:
+        s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T)
+        z_com = (1/mass_total)*s_z
+        # s_x = self.border_xyz[0] + np.dot(densities, self.x_itgr.T)
+        # s_y = self.border_xyz[1] + np.dot(densities, self.y_itgr.T) 
+        # get com:
+        # com_xyz = (1/mass_total)*np.array([s_z, s_y, s_y]).T
+
+            
+        full_itensor = np.zeros((3,3))
+        full_itensor[0][0] = np.dot(densities, (self.y2_itgr + self.z2_itgr).T)
+        full_itensor[1][1] = np.dot(densities, (self.x2_itgr + self.z2_itgr).T)
+        full_itensor[2][2] = np.dot(densities, (self.x2_itgr + self.y2_itgr).T)
+        full_itensor[0][1] = - np.dot(densities, self.xy_itgr.T)
+        full_itensor[1][0] = full_itensor[0][1]
+        full_itensor[0][2] = - np.dot(densities, self.xz_itgr.T)
+        full_itensor[2][0] = full_itensor[0][2]
+        full_itensor[1][2] = - np.dot(densities, self.yz_itgr.T)
+        full_itensor[2][1] = full_itensor[1][2]
+
+        # calculate final inertia tensor by adding the boundary contribution and com change:
+        full_itensor = full_itensor + self.border_border_inertia_tensor - (1/mass_total)*(s_z**2)*diag110
+
+        return mass_total, z_com, full_itensor
 
     def create_grid(self, l=0.25):
         l = self.l
@@ -282,6 +371,35 @@ class WindowApp:
         print("number of BORDER cells:", border_count)
         return
 
+    # function to optimize:
+    def f_top(densities):
+        mass_total, z_com, full_itensor = calc_full_itensor(densities)
+        # I_c squared (I_c = s_x2 + s_y2)
+        i_c2 = (full_itensor[2][2])**2
+        # I_a squared + I_b squared = Tr(I squared)
+        i_ab2 = (full_itensor[0][0])**2 + 2*(full_itensor[0][1])**2 + (full_itensor[1][1])**2
+        obj_function = self.weight_c *(z_com * mass_total)**2 + self.weight_i * (i_ab2/i_c2)
+
+        return obj_function
+
+    # contraints:
+    # x_com and y_com should be 0:
+    def com_z(densities):
+        mass_total = np.sum(densities)
+        s_x = self.border_xyz[0] + np.dot(densities, self.x_itgr.T)
+        s_y = self.border_xyz[1] + np.dot(densities, self.y_itgr.T)
+        s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T) 
+        # get com:
+        com_xyz = (1/mass_total)*np.array([s_x, s_y, s_z]).T
+
+        return s_x, s_y
+    
+    # s_xz and s_yz should be 0:
+    def spin_parallel_z(densities):
+        s_xz = - np.dot(densities, self.xz_itgr.T)
+        s_yz = - np.dot(densities, self.yz_itgr.T)
+        return s_xz, s_yz
+
 
     def draw_voxels(self, cells, l, colr, voxels_name):
         """
@@ -379,23 +497,6 @@ class WindowApp:
         #import pdb
         #pdb.set_trace()
 
-    #def render_both_grids(self, meshes):
-    #    self._widget3d.scene.clear_geometry()
-    #    meshes[0].paint_uniform_color([1,0,0])
-    #    material = rendering.MaterialRecord()
-    #    material.shader = "defaultLit"
-    #    self._widget3d.scene.add_geometry("__ingrid__", meshes[0], material)
-
-    #    meshes[1].paint_uniform_color([0,0,0])
-    #    material = rendering.MaterialRecord()
-    #    material.shader = "defaultLit"
-    #    self._widget3d.scene.add_geometry("__bgrid__", meshes[1], material)
-    #    # render coordinate frame
-    #    # coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=self.inner_mesh_inertia)
-    #    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3)
-    #    self._widget3d.scene.add_geometry("__frame__", coordinate_frame, material)
-    #    #import pdb
-    #    #pdb.set_trace()
 
     def _on_filedlg_done(self, path):
         self._fileedit.text_value = path
