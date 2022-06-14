@@ -400,6 +400,35 @@ class WindowApp:
         s_yz = - np.dot(densities, self.yz_itgr.T)
         return s_xz, s_yz
 
+    # gradient f_top:
+    # 
+    def grad_f_top(densities):
+        top_grad = np.zeros(densities.size)
+        mass_total, z_com, full_itensor = calc_full_itensor(densities)
+        s_z = z_com*mass_total 
+        # cof1 = 2g_c*s_z,      cof2 = 2g_i*A2_xy^2
+        cof1 = 2*self.weight_c*s_z
+        cof2 = 2*self.weight_i*(full_itensor[2][2])**2
+        cof3 = 2*self.weight_i * ((full_itensor[0][0])**2 + (full_itensor[0][1])**2 + (full_itensor[1][1])**2) * (full_itensor[2][2])**2 
+        cof4 = (full_itensor[2][2])**4
+
+        for vi, vox in enumerate(self.inner_voxels):
+            kz = self.z_itgr[vi]
+            kx2y2 = self.x2_itgr[vi] + self.y2_itgr[vi]
+            ky2z2 = self.y2_itgr[vi] + self.z2_itgr[vi]
+            kx2z2 = self.z2_itgr[vi] + self.x2_itgr[vi]
+            kxy = self.xy_itgr[vi]
+
+            grad_i = cof1*kz
+            grad_i += (1/cof4)*cof2*( full_itensor[0][0]*(ky2z2 - 2*z_com*kz) + full_itensor[0][1]*kxy + full_itensor[1][1]*(kx2z2 - 2*z_com*kz) )
+            grad_i -= (1/cof4)*(cof3*kx2y2)
+
+            top_grad[vi] = grad_i
+
+        return top_grad
+
+
+    #---------------------------------------------------------------
 
     def draw_voxels(self, cells, l, colr, voxels_name):
         """
