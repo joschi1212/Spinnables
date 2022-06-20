@@ -7,6 +7,7 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 import numpy as np
+import scipy
 
 print("Spinnables Project")
 print("python version", sys.version)
@@ -31,6 +32,7 @@ class WindowApp:
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
         self.density = 1
+        self.fillings = None
 
         # inertia volume integrals for voxels:
         self.x_itgr = None
@@ -380,7 +382,9 @@ class WindowApp:
         i_ab2 = (full_itensor[0][0])**2 + 2*(full_itensor[0][1])**2 + (full_itensor[1][1])**2
         obj_function = self.weight_c *(z_com * mass_total)**2 + self.weight_i * (i_ab2/i_c2)
 
-        return obj_function
+        grad_function = grad_f_top(densities, mass_total, z_com, full_itensor)
+
+        return (obj_function, grad_function)
 
     # contraints:
     # x_com and y_com should be 0:
@@ -401,10 +405,9 @@ class WindowApp:
         return s_xz, s_yz
 
     # gradient f_top:
-    # 
-    def grad_f_top(densities):
+    def grad_f_top(densities, mass_total, z_com, full_itensor):
         top_grad = np.zeros(densities.size)
-        mass_total, z_com, full_itensor = calc_full_itensor(densities)
+        # mass_total, z_com, full_itensor = calc_full_itensor(densities)
         s_z = z_com*mass_total 
         # cof1 = 2g_c*s_z,      cof2 = 2g_i*A2_xy^2
         cof1 = 2*self.weight_c*s_z
@@ -427,8 +430,21 @@ class WindowApp:
 
         return top_grad
 
+    # optimize with gradient and constraints:
+    def optimize_mass_distr():
+        cell_nb = np.shape(self.inner_voxels)[0]
+        cons = ({'type': 'eq', 'fun': com_z}, {'type': 'eq', 'fun': spin_parallel_z})
+        low_bd = np.zeros(cell_nb)
+        up_bd = np.full(cell_nb, 1)
+        bds = scipy.optimize.Bounds(low_bd, up_bd)
 
-    #---------------------------------------------------------------
+        densities0 = np.full((cell_nb, 1))
+
+        dens_distr = scipy.optimize.minimize(f_top, densities0, method = 'L-BFGS-B', jac = True, bounds = bds, constraints = cons)
+
+        self.fillings = dens_distr
+
+    # ------------------------------------------------------------------------------
 
     def draw_voxels(self, cells, l, colr, voxels_name):
         """
