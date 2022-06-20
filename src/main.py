@@ -190,7 +190,8 @@ class WindowApp:
     
     # returns mass, z_com, and full inertia tensor:
     def calc_full_itensor(densities):
-        mass_total = np.sum(densities)
+        border_nb = np.shape(border_voxels)[0]
+        mass_total = border_nb + np.sum(densities)
         diag110 = np.array([[1,0,0], [0,1,0], [0,0,0]])
         # get s_z = s_z border + s_z inner vox:
         s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T)
@@ -388,21 +389,34 @@ class WindowApp:
 
     # contraints:
     # x_com and y_com should be 0:
-    def com_z(densities):
-        mass_total = np.sum(densities)
+    def com_x(densities):
+        # border mass + inner voxels mass:
+        border_nb = np.shape(border_voxels)[0]
+        mass_total =  border_nb + np.sum(densities)
         s_x = self.border_xyz[0] + np.dot(densities, self.x_itgr.T)
-        s_y = self.border_xyz[1] + np.dot(densities, self.y_itgr.T)
-        s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T) 
         # get com:
-        com_xyz = (1/mass_total)*np.array([s_x, s_y, s_z]).T
+        x_com = (1/mass_total)*s_x
 
-        return s_x, s_y
+        return x_com
+
+    def com_y(densities):
+        # border mass + inner voxels mass:
+        border_nb = np.shape(border_voxels)[0]
+        mass_total =  border_nb + np.sum(densities)
+        s_y = self.border_xyz[1] + np.dot(densities, self.y_itgr.T)
+        # get com:
+        y_com = (1/mass_total)*s_y
+
+        return y_com
     
     # s_xz and s_yz should be 0:
-    def spin_parallel_z(densities):
-        s_xz = - np.dot(densities, self.xz_itgr.T)
-        s_yz = - np.dot(densities, self.yz_itgr.T)
-        return s_xz, s_yz
+    def spin_parallel_x(densities):
+        s_xz = self.border_inertia_tensor[0][2] - np.dot(densities, self.xz_itgr.T)
+        return s_xz
+
+    def spin_parallel_y(densities):
+        s_yz = self.border_inertia_tensor[1][2] - np.dot(densities, self.yz_itgr.T)
+        return s_yz
 
     # gradient f_top:
     def grad_f_top(densities, mass_total, z_com, full_itensor):
@@ -433,7 +447,7 @@ class WindowApp:
     # optimize with gradient and constraints:
     def optimize_mass_distr():
         cell_nb = np.shape(self.inner_voxels)[0]
-        cons = ({'type': 'eq', 'fun': com_z}, {'type': 'eq', 'fun': spin_parallel_z})
+        cons = ({'type': 'eq', 'fun': com_x}, {'type': 'eq', 'fun': com_y}, {'type': 'eq', 'fun': spin_parallel_x}, {'type': 'eq', 'fun': spin_parallel_y})
         low_bd = np.zeros(cell_nb)
         up_bd = np.full(cell_nb, 1)
         bds = scipy.optimize.Bounds(low_bd, up_bd)
