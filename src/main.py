@@ -632,7 +632,7 @@ class WindowApp:
         gui_layout.add_child(construct_inner_button_gui)
 
         #  Place Custom Grid
-        grid_button_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        grid_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         grid_button_text_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         grid_button = gui.Button("Construct Inner Grid")
         grid_button.set_on_clicked(self._on_create_grid)
@@ -646,7 +646,7 @@ class WindowApp:
         gui_layout.add_child(grid_button_gui)
 
         # Border Grid
-        bgrid_button_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        bgrid_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         bgrid_button_text_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         bgrid_button = gui.Button("Construct Border Grid")
         bgrid_button.set_on_clicked(self._on_create_border_grid)
