@@ -445,7 +445,7 @@ class WindowApp:
         return top_grad
 
     # optimize with gradient and constraints:
-    def optimize_mass_distr():
+    def optimize_mass_distr(self):
         cell_nb = np.shape(self.inner_voxels)[0]
         cons = ({'type': 'eq', 'fun': com_x}, {'type': 'eq', 'fun': com_y}, {'type': 'eq', 'fun': spin_parallel_x}, {'type': 'eq', 'fun': spin_parallel_y})
         low_bd = np.zeros(cell_nb)
@@ -518,6 +518,65 @@ class WindowApp:
         else:
             self.render_voxels(lns, colr, name = voxels_name)
 
+
+    def save_voxel_data(self, inner_voxels, inner_sideLength, border_voxels, border_sideLength, meshName):
+        inner_path = os.path.normpath("assets/" + meshName + "_inner_vxls.txt")
+
+        inner_voxels = np.array(inner_voxels)
+        border_voxels = np.array(border_voxels)
+#       with open(inner_path, 'w') as file:
+#           file.write(meshName + "\n")
+#           file.write(str(inner_sideLength) + "\n")
+#           file.write(str(inner_voxels.shape[0]) + "\n")
+#            for voxel in inner_voxels:
+#                file.write(str(voxel) + "\n")
+        np.savetxt(inner_path, inner_voxels)
+        border_path = os.path.normpath(str("assets/" + meshName + "_border_vxls.txt"))
+        np.savetxt(border_path, border_voxels)
+#        with open(border_path, 'w') as file:
+#            file.write(str(meshName, "\n"))
+#            file.write(str(border_sideLength, "\n"))
+#            file.write(str(border_voxels.shape[0], "\n"))
+#            for voxel in border_voxels:
+#                file.write(str(voxel))
+
+    def _on_save_voxel(self):
+        if(self.inner_voxels and self.border_voxels and self.model_name):
+            self.save_voxel_data(self.inner_voxels, self.l, self.border_voxels, self.border_l, self.model_name)
+        else:
+            print("voxels had not been generated")
+
+    def _on_voxeldlg_button(self):
+        filedlg = gui.FileDialog(gui.FileDialog.OPEN, "Select file",
+                                 self.window.theme)
+        filedlg.add_filter(".txt", "voxel data (.txt)")
+        filedlg.add_filter("", "All files")
+        filedlg.set_on_cancel(self._on_filedlg_cancel)
+        filedlg.set_on_done(self._on_load_voxel_done)
+        self.window.show_dialog(filedlg)
+
+    def _on_load_voxel_done(self, path):
+        path = os.path.normpath(path)
+        file_name = os.path.basename(path)
+        lines = None
+        meshName = ""
+        sidelength = 0
+        numVoxels = 0
+        voxels = []
+        with open(path, 'r') as file:
+            meshName = str(file.readline())
+            sidelength = float(file.readline())
+            numVoxels = int(file.readline())
+            lines = file.readLines()
+        for line in lines:
+            voxels.append(line)
+        if("inner" in file_name):
+            self.inner_voxels = np.array(voxels)
+        elif("border" in file_name):
+            self.border_voxels = np.array(voxels)
+        else:
+            print("wrong file type")
+
     def _on_mouse_widget3d(self, event):
         # print(event.type)
         return gui.Widget.EventCallbackResult.IGNORED
@@ -561,6 +620,7 @@ class WindowApp:
         self._fileedit.text_value = path
         self.model_dir = os.path.normpath(path)
         # load model
+        self.model_name = os.path.basename(path)
         self.outer_mesh = o3d.io.read_triangle_mesh(path)
         self.outer_mesh.compute_vertex_normals()
         self.inner_mesh = None
@@ -592,6 +652,7 @@ class WindowApp:
         self._widget3d.frame = gui.Rect(500, w.content_rect.y,
                                    900, w.content_rect.height)
         self.outer_mesh = o3d.geometry.TriangleMesh.create_sphere()
+        self.model_name = "sphere"
         self.outer_mesh.compute_vertex_normals()
         self.render_mesh(self.outer_mesh)
         self._widget3d.scene.set_background([200, 0, 0, 200]) # not working?!
@@ -659,6 +720,28 @@ class WindowApp:
         bgrid_button_gui.add_child(bgrid_button)
         gui_layout.add_child(bgrid_button_gui)
 
+        # Save Voxel widget
+        save_voxels_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        save_voxels_button = gui.Button("Save Voxels")
+        save_voxels_button.set_on_clicked(self._on_save_voxel)
+        save_voxels_button_gui.add_child(save_voxels_button)
+        gui_layout.add_child(save_voxels_button_gui)
+
+        # Voxel file-chooser widget
+        self._voxeledit = gui.TextEdit()
+        voxeldlgbutton = gui.Button("...")
+        voxeldlgbutton.horizontal_padding_em = 0.5
+        voxeldlgbutton.vertical_padding_em = 0
+        voxeldlgbutton.set_on_clicked(self._on_voxeldlg_button)
+
+        voxeledit_layout = gui.Horiz()
+        voxeledit_layout.add_child(gui.Label("Save Voxel files"))
+        voxeledit_layout.add_child(self._voxeledit)
+        voxeledit_layout.add_fixed(0.25 * em)
+        voxeledit_layout.add_child(voxeldlgbutton)
+        # add to the top-level (vertical) layout
+        gui_layout.add_child(voxeledit_layout)
+
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
 
@@ -668,4 +751,4 @@ def main():
     gui.Application.instance.run()
 
 if __name__ == "__main__":
-    main()
+        main()
