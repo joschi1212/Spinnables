@@ -8,6 +8,8 @@ import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 import numpy as np
 import scipy
+from scipy import optimize
+
 
 print("Spinnables Project")
 print("python version", sys.version)
@@ -49,6 +51,7 @@ class WindowApp:
         self.border_com = [0,0,0]
         self.border_xyz = None
         self.border_inertia_tensor = None
+        self.bd_functions = []
 
         # gammas (weights for the center of mass term and the inertia term):
         self.weight_c = 0.5
@@ -118,6 +121,7 @@ class WindowApp:
         else:
             return 1
 
+# ----------------------------- inertia ------------------------------------
 
     def calc_inertia(self, voxels, mass=0.1, l=0.25, CoM=[0,0,0]):
         l = self.l
@@ -167,9 +171,9 @@ class WindowApp:
         bl3 = (self.border_l)**3
         bl5_12 = ((self.border_l)**5)/12
         for b_vox in self.border_voxels:
-            bx = vox[0]
-            by = vox[1]
-            bz = vox[2]
+            bx = b_vox[0]
+            by = b_vox[1]
+            bz = b_vox[2]
             # x, y, z:
             self.border_xyz[0] += bl3*bx
             self.border_xyz[1] += bl3*by
@@ -189,8 +193,8 @@ class WindowApp:
         self.border_inertia_tensor[2][1] = self.border_inertia_tensor[1][2]
     
     # returns mass, z_com, and full inertia tensor:
-    def calc_full_itensor(densities):
-        border_nb = np.shape(border_voxels)[0]
+    def calc_full_itensor(self, densities):
+        border_nb = np.shape(self.border_voxels)[0]
         mass_total = border_nb + np.sum(densities)
         diag110 = np.array([[1,0,0], [0,1,0], [0,0,0]])
         # get s_z = s_z border + s_z inner vox:
@@ -214,9 +218,11 @@ class WindowApp:
         full_itensor[2][1] = full_itensor[1][2]
 
         # calculate final inertia tensor by adding the boundary contribution and com change:
-        full_itensor = full_itensor + self.border_border_inertia_tensor - (1/mass_total)*(s_z**2)*diag110
+        full_itensor = full_itensor + self.border_inertia_tensor - (1/mass_total)*(s_z**2)*diag110
 
         return mass_total, z_com, full_itensor
+
+# ----------------------------- eof inertia ------------------------------------
 
     def create_grid(self, l=0.25):
         l = self.l
@@ -374,52 +380,77 @@ class WindowApp:
         print("number of BORDER cells:", border_count)
         return
 
+# ----------------------------- optimization ------------------------------------
+
     # function to optimize:
-    def f_top(densities):
-        mass_total, z_com, full_itensor = calc_full_itensor(densities)
+    def f_top(self, densities):
+        mass_total, z_com, full_itensor = self.calc_full_itensor(densities)
         # I_c squared (I_c = s_x2 + s_y2)
         i_c2 = (full_itensor[2][2])**2
         # I_a squared + I_b squared = Tr(I squared)
         i_ab2 = (full_itensor[0][0])**2 + 2*(full_itensor[0][1])**2 + (full_itensor[1][1])**2
         obj_function = self.weight_c *(z_com * mass_total)**2 + self.weight_i * (i_ab2/i_c2)
 
-        grad_function = grad_f_top(densities, mass_total, z_com, full_itensor)
+        grad_function = self.grad_f_top(densities, mass_total, z_com, full_itensor)
 
         return (obj_function, grad_function)
 
+    def f_top1(self, densities):
+        mass_total, z_com, full_itensor = self.calc_full_itensor(densities)
+        # I_c squared (I_c = s_x2 + s_y2)
+        i_c2 = (full_itensor[2][2])**2
+        # I_a squared + I_b squared = Tr(I squared)
+        i_ab2 = (full_itensor[0][0])**2 + 2*(full_itensor[0][1])**2 + (full_itensor[1][1])**2
+        obj_function = self.weight_c *(z_com * mass_total)**2 + self.weight_i * (i_ab2/i_c2)
+
+        #grad_function = self.grad_f_top(densities, mass_total, z_com, full_itensor)
+
+        return obj_function
+
     # contraints:
     # x_com and y_com should be 0:
-    def com_x(densities):
+
+    def com_x(self, densities):
         # border mass + inner voxels mass:
-        border_nb = np.shape(border_voxels)[0]
+        border_nb = np.shape(self.border_voxels)[0]
         mass_total =  border_nb + np.sum(densities)
         s_x = self.border_xyz[0] + np.dot(densities, self.x_itgr.T)
         # get com:
         x_com = (1/mass_total)*s_x
 
-        return x_com
+        return x_com-0.1
 
-    def com_y(densities):
+    def cmx(self, densities):
         # border mass + inner voxels mass:
-        border_nb = np.shape(border_voxels)[0]
+        border_nb = np.shape(self.border_voxels)[0]
+        mass_total =  border_nb + np.sum(densities)
+        s_x = self.border_xyz[0] + np.dot(densities, self.x_itgr.T)
+        # get com:
+        x_com = (1/mass_total)*s_x
+
+        return (x_com, mass_total, s_x)
+
+    def com_y(self, densities):
+        # border mass + inner voxels mass:
+        border_nb = np.shape(self.border_voxels)[0]
         mass_total =  border_nb + np.sum(densities)
         s_y = self.border_xyz[1] + np.dot(densities, self.y_itgr.T)
         # get com:
         y_com = (1/mass_total)*s_y
 
-        return y_com
+        return y_com-0.1
     
     # s_xz and s_yz should be 0:
-    def spin_parallel_x(densities):
+    def spin_parallel_x(self, densities):
         s_xz = self.border_inertia_tensor[0][2] - np.dot(densities, self.xz_itgr.T)
         return s_xz
 
-    def spin_parallel_y(densities):
+    def spin_parallel_y(self, densities):
         s_yz = self.border_inertia_tensor[1][2] - np.dot(densities, self.yz_itgr.T)
         return s_yz
 
     # gradient f_top:
-    def grad_f_top(densities, mass_total, z_com, full_itensor):
+    def grad_f_top(self, densities, mass_total, z_com, full_itensor):
         top_grad = np.zeros(densities.size)
         # mass_total, z_com, full_itensor = calc_full_itensor(densities)
         s_z = z_com*mass_total 
@@ -445,20 +476,56 @@ class WindowApp:
         return top_grad
 
     # optimize with gradient and constraints:
-    def optimize_mass_distr():
+    def optimize_mass_distr(self):
         cell_nb = np.shape(self.inner_voxels)[0]
-        cons = ({'type': 'eq', 'fun': com_x}, {'type': 'eq', 'fun': com_y}, {'type': 'eq', 'fun': spin_parallel_x}, {'type': 'eq', 'fun': spin_parallel_y})
-        low_bd = np.zeros(cell_nb)
-        up_bd = np.full(cell_nb, 1)
+        # cons = {'type': 'ineq', 'fun': - bd_functions[0]}, {'type': 'ineq', 'fun': bd_functions[0] - 1}
+        # cons = [{'type': 'eq', 'fun': self.com_x}, {'type': 'eq', 'fun': self.com_y}, {'type': 'eq', 'fun': self.spin_parallel_x}, {'type': 'eq', 'fun': self.spin_parallel_y}]
+        cons = [{'type': 'eq', 'fun': self.com_x}, {'type': 'eq', 'fun': self.com_y}]
+
+        low_bd = np.full(cell_nb, 0.0)
+        up_bd = np.full(cell_nb, 1.0)
         bds = scipy.optimize.Bounds(low_bd, up_bd)
 
-        densities0 = np.full((cell_nb, 1))
+        densities0 = np.full(cell_nb, 0.5)
+        import pdb
+        pdb.set_trace()
+        print("start\n")
+        # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds, constraints = cons)
+        # dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', constraints = cons, options = {'maxiter': 10000})
+        dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', bounds = bds, constraints = cons, options = {'maxiter': 10000})
+        print("finish\n")
+        self.fillings = dens_distr.x
+        print(dens_distr)
+        #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
-        dens_distr = scipy.optimize.minimize(f_top, densities0, method = 'L-BFGS-B', jac = True, bounds = bds, constraints = cons)
+    def optimize_mystic(self):
+        cell_nb = np.shape(self.inner_voxels)[0]
 
-        self.fillings = dens_distr
 
-    # ------------------------------------------------------------------------------
+# ----------------------------- eof optimization ------------------------------------
+
+# ----------------------------- debug optimization ------------------------------------
+
+    def check_fin_dif(self):
+        cel_nb = np.shape(self.inner_voxels)[0]
+        dens = np.full(cel_nb, 0.5)
+        dif = 0.001
+        grad_f = self.f_top(dens)[1]
+        # central difference:
+        for i, d in enumerate(dens):
+            print(i)
+            dens[i] += dif
+            f0 = self.f_top1(dens)
+            dens[i] -= 2*dif
+            f1 = self.f_top1(dens)
+            dens[i] += dif
+            grad_i = grad_f[i]
+            fin_dif = (f0 - f1)/(2*dif)
+
+            print("grad ", grad_i, "vs fin_dif:", fin_dif, "\n")
+        
+
+# ----------------------------- eof debug optimization ------------------------------------
 
     def draw_voxels(self, cells, l, colr, voxels_name):
         """
@@ -581,6 +648,14 @@ class WindowApp:
     def _on_create_border_grid(self):
         self.create_border_grid()
 
+    def _on_optimize_mass(self):
+        #import pdb
+        #pdb.set_trace()
+
+        self.calc_vol_integrals()
+        self.calc_border_itensor()
+        self.optimize_mass_distr()
+
     def setup_gui(self, w):
         em = w.theme.font_size
 
@@ -658,6 +733,20 @@ class WindowApp:
         bgrid_button_gui.add_child(bgrid_button_text_gui)
         bgrid_button_gui.add_child(bgrid_button)
         gui_layout.add_child(bgrid_button_gui)
+
+        # optimize distribution:
+        optimize_button_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        optimize_button_text_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        optimize_button = gui.Button("Optimize Mass")
+        optimize_button.set_on_clicked(self._on_optimize_mass)
+        #optimize_text_edit = gui.TextEdit()
+        #optimize_text_edit.set_on_value_changed(self._on_border_voxel_size_changed)
+        #optimize_text_edit.placeholder_text = "0.25"
+        #optimize_button_text_gui.add_child(gui.Label("Border cell size:"))
+        #optimize_button_text_gui.add_child(optimize_text_edit)
+        #optimize_button_gui.add_child(optimize_button_text_gui)
+        optimize_button_gui.add_child(optimize_button)
+        gui_layout.add_child(optimize_button_gui)
 
         w.add_child(self._widget3d)
         w.add_child(gui_layout)
