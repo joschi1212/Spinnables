@@ -78,7 +78,8 @@ class WindowApp:
 
     def _on_construct_inner_mesh(self):
         """
-        Generates the inner mesh by first deleting duplicated vertices and then translate each vertex
+        Generates the inner mesh by first deleting duplicated vertices and then simplifing the mesh to reduce the
+        number of triangles and then translate each vertex
         along its normal. It generates a new vertex list and uses the original triangle indexing to create a new mesh.
         It normalizes the normals and then multiplies the normal with the self.thickness (float).
         !!Attention!! for too large thickness vertices will overlap and produce faulty results.
@@ -86,18 +87,30 @@ class WindowApp:
         try:
 
             # zip generates a list of tuples
-
-            self.outer_mesh.remove_duplicated_vertices()
-            print(np.shape(np.asarray(self.outer_mesh.vertex_normals)))
-            print(np.shape(np.asarray(self.outer_mesh.vertices)))
+            self.inner_mesh = copy.deepcopy(self.outer_mesh)
+            self.inner_mesh.remove_duplicated_vertices()
+            self.inner_mesh.remove_degenerate_triangles()
+            numNormals = np.shape(np.asarray(self.inner_mesh.vertex_normals))[0]
+            numVertices = np.shape(np.asarray(self.inner_mesh.vertices))[0]
+            numTriangles = np.shape(np.asarray(self.inner_mesh.triangles))[0]
+            print("number of Triangles: ", numTriangles)
+            target_number_of_triangles = int(numTriangles*0.2)
+            self.inner_mesh = self.inner_mesh.simplify_quadric_decimation(target_number_of_triangles)
             new_vertices = []
-            for idx, (normal, vertex) in enumerate(zip(np.asarray(self.outer_mesh.vertex_normals), np.asarray(self.outer_mesh.vertices))):
-                vertex = vertex - ((normal/np.linalg.norm(normal)) * self.thickness)
+            for idx, (normal, vertex) in enumerate(zip(np.asarray(self.inner_mesh.vertex_normals), np.asarray(self.inner_mesh.vertices))):
+                vertex = vertex - ((normal/np.linalg.norm(normal)) * 0)
                 new_vertices.append(vertex)
 
             new_vertices = o3d.cpu.pybind.utility.Vector3dVector(new_vertices)
-            self.inner_mesh = o3d.geometry.TriangleMesh(new_vertices, self.outer_mesh.triangles)
+            self.inner_mesh = o3d.geometry.TriangleMesh(new_vertices, self.inner_mesh.triangles)
+            # self.inner_mesh.merge_close_vertices(0.1)
+            self.inner_mesh.remove_degenerate_triangles()
+            print("Inner Mesh is self intersecting: ", self.inner_mesh.is_self_intersecting())
+            print("Inner Mesh is watertight: ", self.inner_mesh.is_watertight())
 
+            # self.inner_mesh.compute_vertex_normals()
+            # self.inner_mesh.compute_triangle_normals()
+            print("number of Triangles after: ", np.shape(np.asarray(self.inner_mesh.triangles))[0])
             self.render_mesh(self.inner_mesh, name='__inner_mesh__')
             if(self.show_wireframe):
                 self.render_mesh(self.wireframe_outer_mesh, name='__wireframe_outer__', clear=False)
