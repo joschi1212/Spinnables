@@ -9,6 +9,7 @@ import open3d.visualization.rendering as rendering
 import numpy as np
 import scipy
 from scipy import optimize
+import mystic
 
 
 print("Spinnables Project")
@@ -31,8 +32,8 @@ class WindowApp:
         self.inner_voxels = None
         self.border_voxels = None
         self.inner_mesh_inertia = 0
-        self.l = 0.25 # side length of single inner voxel.
-        self.border_l = 0.25 #side length of single border voxel.
+        self.l = 0.05 # side length of single inner voxel.
+        self.border_l = 0.1 # side length of single border voxel.
         self.density = 1
         self.fillings = None
 
@@ -56,6 +57,8 @@ class WindowApp:
         # gammas (weights for the center of mass term and the inertia term):
         self.weight_c = 0.5
         self.weight_i = 0.5
+        self.x_com = 0.0
+        self.y_com = 0.0
 
         self.setup_gui(self.window)
 
@@ -393,7 +396,8 @@ class WindowApp:
 
         grad_function = self.grad_f_top(densities, mass_total, z_com, full_itensor)
 
-        return (obj_function, grad_function)
+        return (obj_function * 10, grad_function)
+        # return (obj_function, grad_function)
 
     def f_top1(self, densities):
         mass_total, z_com, full_itensor = self.calc_full_itensor(densities)
@@ -418,7 +422,31 @@ class WindowApp:
         # get com:
         x_com = (1/mass_total)*s_x
 
-        return x_com-0.1
+        return x_com
+
+    def lin_com_x(self):
+        dens_nb = np.shape(self.inner_voxels)[0]
+        x_com = self.x_com
+        full1 = np.full(dens_nb, 1)
+        border_nb = np.shape(self.border_voxels)[0]
+
+        value = self.border_xyz[0] - x_com * border_nb
+
+        dot_factor = self.x_itgr.T - x_com * full1.T
+        
+        return (dot_factor, value)
+
+    def lin_com_y(self):
+        dens_nb = np.shape(self.inner_voxels)[0]
+        y_com = self.y_com
+        full1 = np.full(dens_nb, 1)
+        border_nb = np.shape(self.border_voxels)[0]
+
+        value = self.border_xyz[1] - y_com * border_nb
+
+        dot_factor = self.y_itgr.T - y_com * full1.T
+        
+        return (dot_factor, value)
 
     def cmx(self, densities):
         # border mass + inner voxels mass:
@@ -438,16 +466,38 @@ class WindowApp:
         # get com:
         y_com = (1/mass_total)*s_y
 
-        return y_com-0.1
+        return y_com
     
+    def com_z(self, densities):
+        # border mass + inner voxels mass:
+        border_nb = np.shape(self.border_voxels)[0]
+        mass_total =  border_nb + np.sum(densities)
+        s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T)
+        # get com:
+        z_com = (1/mass_total)*s_z
+
+        return z_com
+
     # s_xz and s_yz should be 0:
     def spin_parallel_x(self, densities):
         s_xz = self.border_inertia_tensor[0][2] - np.dot(densities, self.xz_itgr.T)
         return s_xz
 
+    def lin_sxz(self):
+        s_xz = 0.0
+        factor = self.xz_itgr.T
+        value = self.border_inertia_tensor[0][2]
+        return factor, value
+
     def spin_parallel_y(self, densities):
         s_yz = self.border_inertia_tensor[1][2] - np.dot(densities, self.yz_itgr.T)
         return s_yz
+
+    def lin_syz(self):
+        s_yz = 0.0
+        factor = self.yz_itgr.T
+        value = self.border_inertia_tensor[1][2]
+        return factor, value
 
     # gradient f_top:
     def grad_f_top(self, densities, mass_total, z_com, full_itensor):
@@ -457,7 +507,7 @@ class WindowApp:
         # cof1 = 2g_c*s_z,      cof2 = 2g_i*A2_xy^2
         cof1 = 2*self.weight_c*s_z
         cof2 = 2*self.weight_i*(full_itensor[2][2])**2
-        cof3 = 2*self.weight_i * ((full_itensor[0][0])**2 + (full_itensor[0][1])**2 + (full_itensor[1][1])**2) * (full_itensor[2][2])**2 
+        cof3 = 2*self.weight_i * ((full_itensor[0][0])**2 + (full_itensor[0][1])**2 + (full_itensor[1][1])**2) * (full_itensor[2][2])
         cof4 = (full_itensor[2][2])**4
 
         for vi, vox in enumerate(self.inner_voxels):
@@ -480,27 +530,86 @@ class WindowApp:
         cell_nb = np.shape(self.inner_voxels)[0]
         # cons = {'type': 'ineq', 'fun': - bd_functions[0]}, {'type': 'ineq', 'fun': bd_functions[0] - 1}
         # cons = [{'type': 'eq', 'fun': self.com_x}, {'type': 'eq', 'fun': self.com_y}, {'type': 'eq', 'fun': self.spin_parallel_x}, {'type': 'eq', 'fun': self.spin_parallel_y}]
-        cons = [{'type': 'eq', 'fun': self.com_x}, {'type': 'eq', 'fun': self.com_y}]
+        
+        # cons = [{'type': 'eq', 'fun': self.com_x}, {'type': 'eq', 'fun': self.com_y}]
+        
+        A_x, val_x = self.lin_com_x()
+        consx = scipy.optimize.LinearConstraint(A_x, val_x, val_x)
+
+        A_y, val_y = self.lin_com_y()
+        consy = scipy.optimize.LinearConstraint(A_y, val_y, val_y)
+
+        A_xz, val_xz = self.lin_sxz()
+        consxz = scipy.optimize.LinearConstraint(A_xz, val_xz, val_xz)
+
+        A_yz, val_yz = self.lin_syz()
+        consyz = scipy.optimize.LinearConstraint(A_yz, val_yz, val_yz)
+
+        # cons = [{'type': 'eq', 'fun': self.com_x}, {'type': 'eq', 'fun': self.com_y}, consx, consy]
+        cons = [consx, consy, consxz, consyz]
 
         low_bd = np.full(cell_nb, 0.0)
         up_bd = np.full(cell_nb, 1.0)
         bds = scipy.optimize.Bounds(low_bd, up_bd)
 
         densities0 = np.full(cell_nb, 0.5)
-        import pdb
-        pdb.set_trace()
+        #import pdb
+        #pdb.set_trace()
         print("start\n")
-        # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds, constraints = cons)
-        # dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', constraints = cons, options = {'maxiter': 10000})
-        dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', bounds = bds, constraints = cons, options = {'maxiter': 10000})
+        dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds, constraints = cons)
+        # dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', constraints = consx, options = {'maxiter': 10000})
+        # dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', bounds = bds, constraints = consx, options = {'maxiter': 10000})
+        # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds)
         print("finish\n")
         self.fillings = dens_distr.x
         print(dens_distr)
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
     def optimize_mystic(self):
+        import pdb
+        pdb.set_trace()
         cell_nb = np.shape(self.inner_voxels)[0]
+        dens0 = [1.0 for i in range(0, cell_nb)]
+        bounds = [(0.0, 1.0) for i in range(cell_nb)]
 
+        Ay, by = self.lin_com_y()
+        by_arr = np.array([[by]])
+
+        #ycons = mystic.symbolic.linear_symbolic(Ay, by_arr)
+        #ycons = mystic.symbolic.solve(ycons)
+        #ycons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(ycons))
+
+        Ax, bx = self.lin_com_x()
+        bx_arr = np.array([[bx]])
+
+        #xcons = mystic.symbolic.linear_symbolic(Ax, bx_arr)
+        #xcons = mystic.symbolic.solve(xcons)
+        #xzcons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(xcons))
+
+        Axz, bxz = self.lin_sxz()
+        bxz_arr = np.array([[bxz]])
+
+        #xzcons = mystic.symbolic.linear_symbolic(Axz, bxz_arr)
+        #xzcons = mystic.symbolic.solve(xzcons)
+        #xzcons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(xzcons))
+
+        Ayz, byz = self.lin_syz()
+
+        A = np.column_stack((Ax, Ay, Axz, Ayz))
+        b = np.array([[bx, by, bxz, byz]])
+        #np.reshape(b, (4,1))
+        cons = mystic.symbolic.linear_symbolic(A.T, b)
+        cons = mystic.symbolic.solve(cons)
+        cons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(cons))
+
+        #consxy = mystic.constraints.and_(xcons, xzcons)
+
+        from mystic.solvers import diffev2
+        from mystic.monitors import VerboseMonitor
+        mon = VerboseMonitor(10)
+        result = diffev2(self.f_top1, x0=bounds, bounds = bounds, constraints = cons, npop=10, gtol=200, disp=False, full_output=True, itermon=mon, maxiter=30*100)
+        print(result[0])
+        print(result[1])
 
 # ----------------------------- eof optimization ------------------------------------
 
@@ -715,6 +824,8 @@ class WindowApp:
         self.calc_vol_integrals()
         self.calc_border_itensor()
         self.optimize_mass_distr()
+        print("---------------------mystic------------------------\n")
+        self.optimize_mystic()
 
     def setup_gui(self, w):
         em = w.theme.font_size
