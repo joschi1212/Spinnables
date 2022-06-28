@@ -34,6 +34,9 @@ class WindowApp:
         self.inner_mesh_inertia = 0
         self.l = 0.05 # side length of single inner voxel.
         self.border_l = 0.1 # side length of single border voxel.
+        self.thickness = 0.1
+        self.l = 0.25 # side length of single inner voxel.
+        self.border_l = 0.25 #side length of single border voxel.
         self.density = 1
         self.fillings = None
 
@@ -74,15 +77,33 @@ class WindowApp:
             self.render_mesh(self.outer_mesh)
 
     def _on_construct_inner_mesh(self):
-        # trans_vec = np.array([-0.1, -0.1, -0.1])
-        # inside_mesh = self.outer_mesh.translate(trans_vec, relative=False)
-        # hull construction currently done with scaling, due to lack of effort...
-        center_vec = np.array([0.0, 0.0, 0.0])
-        self.inner_mesh = copy.deepcopy(self.outer_mesh)  # make copy of mesh and scale it down
-        self.inner_mesh = self.inner_mesh.scale(scale=0.5, center=center_vec)
-        self.render_mesh(self.inner_mesh, name='__inner_mesh__')
-        if(self.show_wireframe):
-            self.render_mesh(self.wireframe_outer_mesh, name='__wireframe_outer__', clear=False)
+        """
+        Generates the inner mesh by first deleting duplicated vertices and then translate each vertex
+        along its normal. It generates a new vertex list and uses the original triangle indexing to create a new mesh.
+        It normalizes the normals and then multiplies the normal with the self.thickness (float).
+        !!Attention!! for too large thickness vertices will overlap and produce faulty results.
+        """
+        try:
+
+            # zip generates a list of tuples
+
+            self.outer_mesh.remove_duplicated_vertices()
+            print(np.shape(np.asarray(self.outer_mesh.vertex_normals)))
+            print(np.shape(np.asarray(self.outer_mesh.vertices)))
+            new_vertices = []
+            for idx, (normal, vertex) in enumerate(zip(np.asarray(self.outer_mesh.vertex_normals), np.asarray(self.outer_mesh.vertices))):
+                vertex = vertex - ((normal/np.linalg.norm(normal)) * self.thickness)
+                new_vertices.append(vertex)
+
+            new_vertices = o3d.cpu.pybind.utility.Vector3dVector(new_vertices)
+            self.inner_mesh = o3d.geometry.TriangleMesh(new_vertices, self.outer_mesh.triangles)
+
+            self.render_mesh(self.inner_mesh, name='__inner_mesh__')
+            if(self.show_wireframe):
+                self.render_mesh(self.wireframe_outer_mesh, name='__wireframe_outer__', clear=False)
+        except Exception as e:
+            print(e)
+
 
     # returns the min and max diagonal points of the bounding box
     def _bd_box_min_max(self, mesh):

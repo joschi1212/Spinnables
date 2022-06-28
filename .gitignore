@@ -1,4 +1,6 @@
 .idea/
+.vs/
+.vscode/
 venv3.9/
-
+venv*/
 *.bak
