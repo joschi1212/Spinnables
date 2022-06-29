@@ -30,6 +30,7 @@ class WindowApp:
         self.wireframe_outer_mesh = None
         self.inner_mesh = None
         self.inner_voxels = None
+        self.scale = False
         self.border_voxels = None
         self.inner_mesh_inertia = 0
         self.thickness = 0.5
@@ -75,6 +76,9 @@ class WindowApp:
         if(not show):  # if show is false render normal mesh
             self.render_mesh(self.outer_mesh)
 
+    def _on_scale_hull(self, scale):
+        self.scale = scale
+
     def _on_construct_inner_mesh(self):
         """
         Generates the inner mesh by first deleting duplicated vertices and then simplifing the mesh to reduce the
@@ -84,26 +88,35 @@ class WindowApp:
         !!Attention!! for too large thickness vertices will overlap and produce faulty results.
         """
         try:
+            if(self.scale):
+                print("scaling object")
+                self.inner_mesh = copy.deepcopy(self.outer_mesh)
+                center = self.inner_mesh.get_center()
+                self.inner_mesh.scale(self.thickness, center)
+            else:
+                print("shrinking object")
+                self.inner_mesh = copy.deepcopy(self.outer_mesh)
+                self.inner_mesh.remove_duplicated_vertices()
+                self.inner_mesh.remove_degenerate_triangles()
+                self.inner_mesh.compute_vertex_normals()
+                numNormals = np.shape(np.asarray(self.inner_mesh.vertex_normals))[0]
+                numVertices = np.shape(np.asarray(self.inner_mesh.vertices))[0]
+                numTriangles = np.shape(np.asarray(self.inner_mesh.triangles))[0]
+                print("number of normals: ", numNormals)
+                print("number of Triangles: ", numTriangles)
+                target_number_of_triangles = self.max_triangles
+                if(self.max_triangles != 0):
+                    print("simplify mesh")
+                    self.inner_mesh = self.inner_mesh.simplify_quadric_decimation(target_number_of_triangles)
+                new_vertices = []
+                for idx, (normal, vertex) in enumerate(zip(np.asarray(self.inner_mesh.vertex_normals), np.asarray(self.inner_mesh.vertices))):
+                    vertex = vertex - ((normal/np.linalg.norm(normal)) * self.thickness)
+                    new_vertices.append(vertex)
 
-            # zip generates a list of tuples
-            self.inner_mesh = copy.deepcopy(self.outer_mesh)
-            self.inner_mesh.remove_duplicated_vertices()
-            self.inner_mesh.remove_degenerate_triangles()
-            numNormals = np.shape(np.asarray(self.inner_mesh.vertex_normals))[0]
-            numVertices = np.shape(np.asarray(self.inner_mesh.vertices))[0]
-            numTriangles = np.shape(np.asarray(self.inner_mesh.triangles))[0]
-            print("number of Triangles: ", numTriangles)
-            target_number_of_triangles = self.max_triangles
-            self.inner_mesh = self.inner_mesh.simplify_quadric_decimation(target_number_of_triangles)
-            new_vertices = []
-            for idx, (normal, vertex) in enumerate(zip(np.asarray(self.inner_mesh.vertex_normals), np.asarray(self.inner_mesh.vertices))):
-                vertex = vertex - ((normal/np.linalg.norm(normal)) * self.thickness)
-                new_vertices.append(vertex)
-
-            new_vertices = o3d.cpu.pybind.utility.Vector3dVector(new_vertices)
-            self.inner_mesh = o3d.geometry.TriangleMesh(new_vertices, self.inner_mesh.triangles)
-            # self.inner_mesh.merge_close_vertices(0.1)
-            self.inner_mesh.remove_degenerate_triangles()
+                new_vertices = o3d.cpu.pybind.utility.Vector3dVector(new_vertices)
+                self.inner_mesh = o3d.geometry.TriangleMesh(new_vertices, self.inner_mesh.triangles)
+                # self.inner_mesh.merge_close_vertices(0.1)
+                self.inner_mesh.remove_degenerate_triangles()
             print("Inner Mesh is self intersecting: ", self.inner_mesh.is_self_intersecting())
             print("Inner Mesh is watertight: ", self.inner_mesh.is_watertight())
             print("Inner Mesh is intersecting with border mesh: ", self.inner_mesh.is_intersecting(self.outer_mesh))
@@ -981,12 +994,15 @@ class WindowApp:
         # add to the top-level (vertical) layout
         gui_layout.add_child(fileedit_layout)
 
-        # Wireframe Checkbox
-        wireframe_check_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        # Checkbox for wireframe and hull generation
+        check_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
         wireframe_check = gui.Checkbox("Show Wireframe")
         wireframe_check.set_on_checked(self._on_show_wireframe)
-        wireframe_check_gui.add_child(wireframe_check)
-        gui_layout.add_child(wireframe_check_gui)
+        scaling_check = gui.Checkbox("Scale")
+        scaling_check.set_on_checked(self._on_scale_hull)
+        check_gui.add_child(wireframe_check)
+        check_gui.add_child(scaling_check)
+        gui_layout.add_child(check_gui)
 
         # Construct inner mesh
         construct_inner_mesh_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
