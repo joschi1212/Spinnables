@@ -743,13 +743,13 @@ class WindowApp:
         if self.inner_voxels_optmized_scipy is None:
             self.inner_voxels_optmized_scipy = []
             for idx, filling in enumerate(self.fillings):
-                if filling == 1:
+                if filling == 0:
                     self.inner_voxels_optmized_scipy.append(self.inner_voxels[idx])
 
         if self.inner_voxels_optimized_mystic is None:
             self.inner_voxels_optimized_mystic = []
             for idx, filling in enumerate(self.myst_fillings):
-                if filling == 1:
+                if filling == 0:
                     self.inner_voxels_optimized_mystic.append(self.inner_voxels[idx])
 
 
@@ -989,8 +989,8 @@ class WindowApp:
             if((self.border_inertia_tensor is None) and (self.border_xyz is None)):
                 self.calc_border_itensor()
             self.optimize_mass_distr()
-            print("---------------------mystic------------------------\n")
-            self.optimize_mystic()
+            # print("---------------------mystic------------------------\n")
+            # self.optimize_mystic()
 
             self.calc_optimized_voxels()
         except Exception as e:
