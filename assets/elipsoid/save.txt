@@ -1,0 +1,4 @@
+0.15
+0.05
+assets\elipsoid\border_vxls.txt
+assets\elipsoid\inner_vxls.txt

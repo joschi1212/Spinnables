@@ -956,12 +956,16 @@ class WindowApp:
     def _on_optimize_mass(self):
         #import pdb
         #pdb.set_trace()
+        try:
 
-        self.calc_vol_integrals()
-        self.calc_border_itensor()
-        self.optimize_mass_distr()
-        print("---------------------mystic------------------------\n")
-        self.optimize_mystic()
+            self.calc_vol_integrals()
+            if((self.border_inertia_tensor is None) and (self.border_xyz is None)):
+                self.calc_border_itensor()
+            self.optimize_mass_distr()
+            print("---------------------mystic------------------------\n")
+            self.optimize_mystic()
+        except Exception as e:
+            print(e)
 
     def setup_gui(self, w):
         em = w.theme.font_size
