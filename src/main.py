@@ -21,7 +21,8 @@ class WindowApp:
 
     def __init__(self):
         self.window = gui.Application.instance.create_window("Spinnables", 1400, 900)
-
+        cwd = os.getcwd()
+        print("Current working directory: {0}".format(cwd))
         # member variables
         self.model_dir = ""
         self.model_name = ""
