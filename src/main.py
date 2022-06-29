@@ -40,6 +40,7 @@ class WindowApp:
         self.border_l = 0.25 #side length of single border voxel.
         self.density = 1
         self.fillings = None
+        self.myst_fillings = None
 
         # inertia volume integrals for voxels:
         self.x_itgr = None
@@ -610,6 +611,13 @@ class WindowApp:
         # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds)
         print("finish\n")
         self.fillings = dens_distr.x
+
+        for i, fill in enumerate(self.fillings):
+            if(fill<0.50):
+                self.fillings[i] = 0
+            else:
+                self.fillings[i] = 1
+
         print(dens_distr)
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
@@ -657,6 +665,14 @@ class WindowApp:
             result = diffev2(self.f_top1, x0=bounds, bounds = bounds, constraints = cons, npop=10, gtol=200, disp=False, full_output=True, itermon=mon, maxiter=30*100)
             print(result[0])
             print(result[1])
+
+            for i, fill in enumerate(result[0]):
+                if(fill < 0.50):
+                    result[0] = 0
+                else:
+                    result[0] = 1
+
+            self.myst_fillings = result[0]
 
         except Exception as e:
             print(e)
