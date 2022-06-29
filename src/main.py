@@ -921,7 +921,8 @@ class WindowApp:
         self._fileedit.text_value = path
         self.model_dir = os.path.normpath(path)
         # load model
-        self.model_name = os.path.basename(path)
+        self.model_name = os.path.splitext(path)[0]
+        print("model name is: ", self.model_name)
         self.outer_mesh = o3d.io.read_triangle_mesh(path)
         self.outer_mesh.compute_vertex_normals()
         self.inner_mesh = None
