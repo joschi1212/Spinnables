@@ -32,7 +32,8 @@ class WindowApp:
         self.inner_voxels = None
         self.border_voxels = None
         self.inner_mesh_inertia = 0
-        self.thickness = 0.1
+        self.thickness = 0.5
+        self.max_triangles = 200
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
         self.density = 1
@@ -92,11 +93,11 @@ class WindowApp:
             numVertices = np.shape(np.asarray(self.inner_mesh.vertices))[0]
             numTriangles = np.shape(np.asarray(self.inner_mesh.triangles))[0]
             print("number of Triangles: ", numTriangles)
-            target_number_of_triangles = int(numTriangles*0.3)
+            target_number_of_triangles = self.max_triangles
             self.inner_mesh = self.inner_mesh.simplify_quadric_decimation(target_number_of_triangles)
             new_vertices = []
             for idx, (normal, vertex) in enumerate(zip(np.asarray(self.inner_mesh.vertex_normals), np.asarray(self.inner_mesh.vertices))):
-                vertex = vertex - ((normal/np.linalg.norm(normal)) * 0.5)
+                vertex = vertex - ((normal/np.linalg.norm(normal)) * self.thickness)
                 new_vertices.append(vertex)
 
             new_vertices = o3d.cpu.pybind.utility.Vector3dVector(new_vertices)
@@ -917,6 +918,12 @@ class WindowApp:
     def _on_voxel_size_changed(self, new_size):
         self.l = float(new_size)
 
+    def _on_thickness_changed(self, new_thickness):
+        self.thickness = float(new_thickness)
+
+    def _on_max_triangles_changed(self, new_max_triangles):
+        self.max_triangles = int(new_max_triangles)
+
     def _on_border_voxel_size_changed(self, new_size):
         self.border_l = float(new_size)
 
@@ -981,7 +988,21 @@ class WindowApp:
         gui_layout.add_child(wireframe_check_gui)
 
         # Construct inner mesh
+        construct_inner_mesh_gui = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+
+        construct_inner_mesh_text = gui.Horiz(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        max_triangles_text_edit = gui.TextEdit()
+        max_triangles_text_edit.set_on_value_changed(self._on_max_triangles_changed)
+        max_triangles_text_edit.placeholder_text = '200'
+        thickness_text_edit = gui.TextEdit()
+        thickness_text_edit.set_on_value_changed(self._on_thickness_changed)
+        thickness_text_edit.placeholder_text = '0.5'
+        construct_inner_mesh_text.add_child(gui.Label("max T"))
+        construct_inner_mesh_text.add_child(max_triangles_text_edit)
+        construct_inner_mesh_text.add_child(gui.Label("thick"))
+        construct_inner_mesh_text.add_child(thickness_text_edit)
         construct_inner_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
+        construct_inner_button_gui.add_child(construct_inner_mesh_text)
         construct_inner_button = gui.Button("Construct Inner Mesh")
         construct_inner_button.set_on_clicked(self._on_construct_inner_mesh)
         construct_inner_button_gui.add_child(construct_inner_button)
