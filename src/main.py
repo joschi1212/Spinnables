@@ -586,6 +586,7 @@ class WindowApp:
         # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds)
         print("finish\n")
         self.fillings = dens_distr.x
+        print(self.fillings)
 
         for i, fill in enumerate(self.fillings):
             if(fill<0.50):
@@ -988,9 +989,13 @@ class WindowApp:
             self.calc_vol_integrals()
             if((self.border_inertia_tensor is None) and (self.border_xyz is None)):
                 self.calc_border_itensor()
+
             self.optimize_mass_distr()
-            # print("---------------------mystic------------------------\n")
-            # self.optimize_mystic()
+            
+            want_mystic = input('Should mystic run for you?')
+            if (want_mystic == 'y'):
+                print("---------------------mystic------------------------\n")
+                self.optimize_mystic()
 
             self.calc_optimized_voxels()
         except Exception as e:
