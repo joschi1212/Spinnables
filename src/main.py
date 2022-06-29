@@ -958,7 +958,8 @@ class WindowApp:
         #pdb.set_trace()
 
         self.calc_vol_integrals()
-        self.calc_border_itensor()
+        if((self.border_inertia_tensor is not None) and (self.border_xyz is not None)):
+            self.calc_border_itensor()
         self.optimize_mass_distr()
         print("---------------------mystic------------------------\n")
         self.optimize_mystic()
