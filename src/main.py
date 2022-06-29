@@ -106,6 +106,7 @@ class WindowApp:
             self.inner_mesh.remove_degenerate_triangles()
             print("Inner Mesh is self intersecting: ", self.inner_mesh.is_self_intersecting())
             print("Inner Mesh is watertight: ", self.inner_mesh.is_watertight())
+            print("Inner Mesh is intersecting with border mesh: ", self.inner_mesh.is_intersecting(self.outer_mesh))
 
             self.inner_mesh.compute_vertex_normals()
             self.inner_mesh.compute_triangle_normals()
