@@ -598,50 +598,52 @@ class WindowApp:
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
     def optimize_mystic(self):
-        import pdb
-        pdb.set_trace()
-        cell_nb = np.shape(self.inner_voxels)[0]
-        dens0 = [1.0 for i in range(0, cell_nb)]
-        bounds = [(0.0, 1.0) for i in range(cell_nb)]
+        try:
+            cell_nb = np.shape(self.inner_voxels)[0]
+            dens0 = [1.0 for i in range(0, cell_nb)]
+            bounds = [(0.0, 1.0) for i in range(cell_nb)]
 
-        Ay, by = self.lin_com_y()
-        by_arr = np.array([[by]])
+            Ay, by = self.lin_com_y()
+            by_arr = np.array([[by]])
 
-        #ycons = mystic.symbolic.linear_symbolic(Ay, by_arr)
-        #ycons = mystic.symbolic.solve(ycons)
-        #ycons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(ycons))
+            #ycons = mystic.symbolic.linear_symbolic(Ay, by_arr)
+            #ycons = mystic.symbolic.solve(ycons)
+            #ycons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(ycons))
 
-        Ax, bx = self.lin_com_x()
-        bx_arr = np.array([[bx]])
+            Ax, bx = self.lin_com_x()
+            bx_arr = np.array([[bx]])
 
-        #xcons = mystic.symbolic.linear_symbolic(Ax, bx_arr)
-        #xcons = mystic.symbolic.solve(xcons)
-        #xzcons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(xcons))
+            #xcons = mystic.symbolic.linear_symbolic(Ax, bx_arr)
+            #xcons = mystic.symbolic.solve(xcons)
+            #xzcons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(xcons))
 
-        Axz, bxz = self.lin_sxz()
-        bxz_arr = np.array([[bxz]])
+            Axz, bxz = self.lin_sxz()
+            bxz_arr = np.array([[bxz]])
 
-        #xzcons = mystic.symbolic.linear_symbolic(Axz, bxz_arr)
-        #xzcons = mystic.symbolic.solve(xzcons)
-        #xzcons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(xzcons))
+            #xzcons = mystic.symbolic.linear_symbolic(Axz, bxz_arr)
+            #xzcons = mystic.symbolic.solve(xzcons)
+            #xzcons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(xzcons))
 
-        Ayz, byz = self.lin_syz()
+            Ayz, byz = self.lin_syz()
 
-        A = np.column_stack((Ax, Ay, Axz, Ayz))
-        b = np.array([[bx, by, bxz, byz]])
-        #np.reshape(b, (4,1))
-        cons = mystic.symbolic.linear_symbolic(A.T, b)
-        cons = mystic.symbolic.solve(cons)
-        cons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(cons))
+            A = np.column_stack((Ax, Ay, Axz, Ayz))
+            b = np.array([[bx, by, bxz, byz]])
+            #np.reshape(b, (4,1))
+            cons = mystic.symbolic.linear_symbolic(A.T, b)
+            cons = mystic.symbolic.solve(cons)
+            cons = mystic.symbolic.generate_constraint(mystic.symbolic.generate_solvers(cons))
 
-        #consxy = mystic.constraints.and_(xcons, xzcons)
+            #consxy = mystic.constraints.and_(xcons, xzcons)
 
-        from mystic.solvers import diffev2
-        from mystic.monitors import VerboseMonitor
-        mon = VerboseMonitor(10)
-        result = diffev2(self.f_top1, x0=bounds, bounds = bounds, constraints = cons, npop=10, gtol=200, disp=False, full_output=True, itermon=mon, maxiter=30*100)
-        print(result[0])
-        print(result[1])
+            from mystic.solvers import diffev2
+            from mystic.monitors import VerboseMonitor
+            mon = VerboseMonitor(10)
+            result = diffev2(self.f_top1, x0=bounds, bounds = bounds, constraints = cons, npop=10, gtol=200, disp=False, full_output=True, itermon=mon, maxiter=30*100)
+            print(result[0])
+            print(result[1])
+
+        except Exception as e:
+            print(e)
 
 # ----------------------------- eof optimization ------------------------------------
 
@@ -744,49 +746,50 @@ class WindowApp:
             border_xyz_path = os.path.normpath(dir_path + "/border_xyz.txt")
             border_I_tensor_path = os.path.normpath(dir_path + "/border_I_tensor.txt")
 
-            if(not os.path.exists(dir_path)):
+            dir_exists = os.path.exists(dir_path)
+            if(not dir_exists):
                 os.mkdir(dir_path)
 
             inner_voxels = np.array(inner_voxels)
             border_voxels = np.array(border_voxels)
 
-            if(self.inner_voxels):
+            if(self.inner_voxels is not None):
                 np.savetxt(inner_path, inner_voxels)
                 print("inner_voxels saved")
                 print(inner_path)
             else:
                 print("Save failed. inner voxels not available")
 
-            if(self.border_voxels):
+            if(self.border_voxels is not None):
                 np.savetxt(border_path, border_voxels)
                 print("border_voxels saved")
                 print(border_path)
             else:
                 print("Save failed. border voxels not available")
 
-            if(self.border_xyz):
+            if(self.border_xyz is not None):
                 np.savetxt(border_xyz_path, self.border_xyz)
                 print("border_xyz saved!")
                 print(border_xyz_path)
             else:
                 print("Save failed. border_xyz not available")
 
-            if(self.border_inertia_tensor):
-                np.savetxt(border_I_tensor, self.border_inertia_tensor)
+            if(self.border_inertia_tensor is not None):
+                np.savetxt(border_I_tensor_path, self.border_inertia_tensor)
                 print("border_inertia_tensor saved!")
                 print(border_I_tensor_path)
             else:
                 print("Save failed. border_inertia_tensor not available")
 
-            with open(save_path, 'a') as file:
+            with open(save_path, 'w') as file:
                 file.write(str(inner_sideLength) + "\n")
                 file.write(str(border_sideLength) + "\n")
-                if(self.inner_voxels): file.write(border_path + "\n")
-                if(self.border_voxels): file.write(inner_path + "\n")
-                if(self.border_xyz): file.write(border_xyz_path + "\n")
-                if(self.border_inertia_tensor) : file.write(border_I_tensor_path + "\n")
+                if(self.inner_voxels is not None): file.write(border_path + "\n")
+                if(self.border_voxels is not None): file.write(inner_path + "\n")
+                if(self.border_xyz is not None): file.write(border_xyz_path + "\n")
+                if(self.border_inertia_tensor is not None) : file.write(border_I_tensor_path + "\n")
 
-            with open(readme_path, 'a') as file:
+            with open(readme_path, 'w') as file:
                 file.write("save file description: \nfirst line is inner voxel side length, second line is border voxel"
                            " side length, rest of the lines are paths to the saved numpy arrays ")
 
@@ -825,27 +828,27 @@ class WindowApp:
                 print("border_vxls_file not found!")
 
             if (os.path.exists(inner_vxls_file)):
-                self.inner_voxels = np.loadtxt(inner_vxls_file)
+                self.inner_voxels = np.loadtxt(inner_vxls_file).tolist()
                 print("inner_vxls_file loaded!")
             else:
                 print("inner_vxls_file not found!")
 
             if (os.path.exists(border_xyz_file)):
-                self.border_voxels = np.loadtxt(border_xyz_file)
+                self.border_xyz = np.loadtxt(border_xyz_file).tolist()
                 print("border_xyz_file loaded!")
             else:
                 print("border_xyz_file not found!")
 
             if (os.path.exists(border_I_tensor_file)):
-                self.border_voxels = np.loadtxt(border_I_tensor_file)
+                self.border_inertia_tensor = np.loadtxt(border_I_tensor_file)
                 print("border_I_tensor_file loaded!")
             else:
                 print("border_I_tensor_file not found!")
 
             if (os.path.exists(save_file)):
                 with open(save_file, "r") as file:
-                    self.border_l = float(file.readline())
                     self.l = float(file.readline())
+                    self.border_l = float(file.readline())
                 print("inner_voxel side length loaded: " + str(self.l))
                 print("border_voxel side length loaded: " + str(self.border_l))
             else:
@@ -1014,7 +1017,7 @@ class WindowApp:
 
         # Save Voxel widget
         save_voxels_button_gui = gui.Vert(0, gui.Margins(0.5 * em, 0.5 * em, 0.5 * em, 0.5 * em))
-        save_voxels_button = gui.Button("Save Voxels")
+        save_voxels_button = gui.Button("Save Stuff")
         save_voxels_button.set_on_clicked(self._on_save_voxel)
         save_voxels_button_gui.add_child(save_voxels_button)
         gui_layout.add_child(save_voxels_button_gui)

@@ -2,7 +2,5 @@
 0.25
 assets\sphere\border_vxls.txt
 assets\sphere\inner_vxls.txt
-0.25
-0.25
-assets\sphere\border_vxls.txt
-assets\sphere\inner_vxls.txt
+assets\sphere\border_xyz.txt
+assets\sphere\border_I_tensor.txt
