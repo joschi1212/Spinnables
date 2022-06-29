@@ -610,6 +610,13 @@ class WindowApp:
         # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds)
         print("finish\n")
         self.fillings = dens_distr.x
+
+        for i, fill in enumerate(self.fillings):
+            if(fill<0.50):
+                self.fillings[i] = 0
+            else:
+                self.fillings[i] = 1
+
         print(dens_distr)
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
