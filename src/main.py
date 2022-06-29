@@ -21,8 +21,8 @@ class WindowApp:
 
     def __init__(self):
         self.window = gui.Application.instance.create_window("Spinnables", 1400, 900)
-        cwd = os.getcwd()
-        print("Current working directory: {0}".format(cwd))
+        self.cwd = os.getcwd()
+        print("Current working directory: {0}".format(self.cwd))
         # member variables
         self.model_dir = ""
         self.model_name = ""
@@ -754,6 +754,10 @@ class WindowApp:
         The data can be loaded with the numpy function np.loadtxt(path)
         """
         try:
+            os.chdir(self.cwd)
+            current_cwd = os.getcwd()
+            print("Current working directory: {0}".format(current_cwd))
+
             dir_path = os.path.normpath("assets/" + meshName)
             border_path = os.path.normpath(dir_path + "/border_vxls.txt")
             inner_path = os.path.normpath(dir_path + "/inner_vxls.txt")
@@ -921,7 +925,7 @@ class WindowApp:
         self._fileedit.text_value = path
         self.model_dir = os.path.normpath(path)
         # load model
-        self.model_name = os.path.splitext(path)[0]
+        self.model_name = os.path.splitext(os.path.basename(path))[0]
         print("model name is: ", self.model_name)
         self.outer_mesh = o3d.io.read_triangle_mesh(path)
         self.outer_mesh.compute_vertex_normals()
