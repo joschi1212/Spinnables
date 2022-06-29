@@ -32,8 +32,6 @@ class WindowApp:
         self.inner_voxels = None
         self.border_voxels = None
         self.inner_mesh_inertia = 0
-        self.l = 0.05 # side length of single inner voxel.
-        self.border_l = 0.1 # side length of single border voxel.
         self.thickness = 0.1
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
@@ -94,11 +92,11 @@ class WindowApp:
             numVertices = np.shape(np.asarray(self.inner_mesh.vertices))[0]
             numTriangles = np.shape(np.asarray(self.inner_mesh.triangles))[0]
             print("number of Triangles: ", numTriangles)
-            target_number_of_triangles = int(numTriangles*0.2)
+            target_number_of_triangles = int(numTriangles*0.3)
             self.inner_mesh = self.inner_mesh.simplify_quadric_decimation(target_number_of_triangles)
             new_vertices = []
             for idx, (normal, vertex) in enumerate(zip(np.asarray(self.inner_mesh.vertex_normals), np.asarray(self.inner_mesh.vertices))):
-                vertex = vertex - ((normal/np.linalg.norm(normal)) * 0)
+                vertex = vertex - ((normal/np.linalg.norm(normal)) * 0.5)
                 new_vertices.append(vertex)
 
             new_vertices = o3d.cpu.pybind.utility.Vector3dVector(new_vertices)
@@ -108,8 +106,8 @@ class WindowApp:
             print("Inner Mesh is self intersecting: ", self.inner_mesh.is_self_intersecting())
             print("Inner Mesh is watertight: ", self.inner_mesh.is_watertight())
 
-            # self.inner_mesh.compute_vertex_normals()
-            # self.inner_mesh.compute_triangle_normals()
+            self.inner_mesh.compute_vertex_normals()
+            self.inner_mesh.compute_triangle_normals()
             print("number of Triangles after: ", np.shape(np.asarray(self.inner_mesh.triangles))[0])
             self.render_mesh(self.inner_mesh, name='__inner_mesh__')
             if(self.show_wireframe):
@@ -676,6 +674,7 @@ class WindowApp:
         Arguments:
             cells: A list of 3D coordinates representing the voxels's center
             l: The side length of a single voxel
+            voxels_name: Name of the voxels mesh
         """
         if(not len(cells)):
             return
@@ -730,62 +729,135 @@ class WindowApp:
 
 
     def save_voxel_data(self, inner_voxels, inner_sideLength, border_voxels, border_sideLength, meshName):
-        inner_path = os.path.normpath("assets/" + meshName + "_inner_vxls.txt")
+        """
+        Saves available data into a folder structure.
+        Each mesh gets its own folder named after the mesh file.
+        The save files saves meta data like voxel sidelength.
+        The data can be loaded with the numpy function np.loadtxt(path)
+        """
+        try:
+            dir_path = os.path.normpath("assets/" + meshName)
+            border_path = os.path.normpath(dir_path + "/border_vxls.txt")
+            inner_path = os.path.normpath(dir_path + "/inner_vxls.txt")
+            save_path = os.path.normpath(dir_path + "/save.txt")
+            readme_path = os.path.normpath(dir_path + "/readme.txt")
+            border_xyz_path = os.path.normpath(dir_path + "/border_xyz.txt")
+            border_I_tensor_path = os.path.normpath(dir_path + "/border_I_tensor.txt")
 
-        inner_voxels = np.array(inner_voxels)
-        border_voxels = np.array(border_voxels)
-#       with open(inner_path, 'w') as file:
-#           file.write(meshName + "\n")
-#           file.write(str(inner_sideLength) + "\n")
-#           file.write(str(inner_voxels.shape[0]) + "\n")
-#            for voxel in inner_voxels:
-#                file.write(str(voxel) + "\n")
-        np.savetxt(inner_path, inner_voxels)
-        border_path = os.path.normpath(str("assets/" + meshName + "_border_vxls.txt"))
-        np.savetxt(border_path, border_voxels)
-#        with open(border_path, 'w') as file:
-#            file.write(str(meshName, "\n"))
-#            file.write(str(border_sideLength, "\n"))
-#            file.write(str(border_voxels.shape[0], "\n"))
-#            for voxel in border_voxels:
-#                file.write(str(voxel))
+            if(not os.path.exists(dir_path)):
+                os.mkdir(dir_path)
+
+            inner_voxels = np.array(inner_voxels)
+            border_voxels = np.array(border_voxels)
+
+            if(self.inner_voxels):
+                np.savetxt(inner_path, inner_voxels)
+                print("inner_voxels saved")
+                print(inner_path)
+            else:
+                print("Save failed. inner voxels not available")
+
+            if(self.border_voxels):
+                np.savetxt(border_path, border_voxels)
+                print("border_voxels saved")
+                print(border_path)
+            else:
+                print("Save failed. border voxels not available")
+
+            if(self.border_xyz):
+                np.savetxt(border_xyz_path, self.border_xyz)
+                print("border_xyz saved!")
+                print(border_xyz_path)
+            else:
+                print("Save failed. border_xyz not available")
+
+            if(self.border_inertia_tensor):
+                np.savetxt(border_I_tensor, self.border_inertia_tensor)
+                print("border_inertia_tensor saved!")
+                print(border_I_tensor_path)
+            else:
+                print("Save failed. border_inertia_tensor not available")
+
+            with open(save_path, 'a') as file:
+                file.write(str(inner_sideLength) + "\n")
+                file.write(str(border_sideLength) + "\n")
+                if(self.inner_voxels): file.write(border_path + "\n")
+                if(self.border_voxels): file.write(inner_path + "\n")
+                if(self.border_xyz): file.write(border_xyz_path + "\n")
+                if(self.border_inertia_tensor) : file.write(border_I_tensor_path + "\n")
+
+            with open(readme_path, 'a') as file:
+                file.write("save file description: \nfirst line is inner voxel side length, second line is border voxel"
+                           " side length, rest of the lines are paths to the saved numpy arrays ")
+
+        except Exception as e:
+            print(e)
 
     def _on_save_voxel(self):
-        if(self.inner_voxels and self.border_voxels and self.model_name):
-            self.save_voxel_data(self.inner_voxels, self.l, self.border_voxels, self.border_l, self.model_name)
-        else:
-            print("voxels had not been generated")
+        self.save_voxel_data(self.inner_voxels, self.l, self.border_voxels, self.border_l, self.model_name)
+
 
     def _on_voxeldlg_button(self):
-        filedlg = gui.FileDialog(gui.FileDialog.OPEN, "Select file",
+        filedlg = gui.FileDialog(gui.FileDialog.OPEN, "Select save file",
                                  self.window.theme)
-        filedlg.add_filter(".txt", "voxel data (.txt)")
+        filedlg.add_filter(".txt", "save file (.txt)")
         filedlg.add_filter("", "All files")
         filedlg.set_on_cancel(self._on_filedlg_cancel)
         filedlg.set_on_done(self._on_load_voxel_done)
         self.window.show_dialog(filedlg)
 
-    def _on_load_voxel_done(self, path):
-        path = os.path.normpath(path)
-        file_name = os.path.basename(path)
-        lines = None
-        meshName = ""
-        sidelength = 0
-        numVoxels = 0
-        voxels = []
-        with open(path, 'r') as file:
-            meshName = str(file.readline())
-            sidelength = float(file.readline())
-            numVoxels = int(file.readline())
-            lines = file.readLines()
-        for line in lines:
-            voxels.append(line)
-        if("inner" in file_name):
-            self.inner_voxels = np.array(voxels)
-        elif("border" in file_name):
-            self.border_voxels = np.array(voxels)
-        else:
-            print("wrong file type")
+    def _on_load_voxel_done(self, save_path):
+        """
+        Load data from mesh folder
+        """
+        try:
+            folder_path = os.path.dirname(save_path)
+            border_vxls_file = os.path.normpath(folder_path + "/border_vxls.txt")
+            inner_vxls_file = os.path.normpath(folder_path + "/inner_vxls.txt")
+            save_file = os.path.normpath(folder_path + "/save.txt")
+            border_xyz_file = os.path.normpath(folder_path + "/border_xyz.txt")
+            border_I_tensor_file = os.path.normpath(folder_path + "/border_I_tensor.txt")
+
+            if (os.path.exists(border_vxls_file)):
+                self.border_voxels = np.loadtxt(border_vxls_file)
+                print("border_vxls_file loaded!")
+            else:
+                print("border_vxls_file not found!")
+
+            if (os.path.exists(inner_vxls_file)):
+                self.inner_voxels = np.loadtxt(inner_vxls_file)
+                print("inner_vxls_file loaded!")
+            else:
+                print("inner_vxls_file not found!")
+
+            if (os.path.exists(border_xyz_file)):
+                self.border_voxels = np.loadtxt(border_xyz_file)
+                print("border_xyz_file loaded!")
+            else:
+                print("border_xyz_file not found!")
+
+            if (os.path.exists(border_I_tensor_file)):
+                self.border_voxels = np.loadtxt(border_I_tensor_file)
+                print("border_I_tensor_file loaded!")
+            else:
+                print("border_I_tensor_file not found!")
+
+            if (os.path.exists(save_file)):
+                with open(save_file, "r") as file:
+                    self.border_l = float(file.readline())
+                    self.l = float(file.readline())
+                print("inner_voxel side length loaded: " + str(self.l))
+                print("border_voxel side length loaded: " + str(self.border_l))
+            else:
+                print("save file not found!")
+
+            self.draw_voxels(self.inner_voxels, self.l, [1, 0, 0], "__innerg__")
+            self.draw_voxels(self.border_voxels, self.border_l, [0, 0, 0], "__borderg__")
+            self.window.close_dialog()
+
+
+        except Exception as e:
+            print(e)
 
     def _on_mouse_widget3d(self, event):
         # print(event.type)
@@ -955,7 +1027,7 @@ class WindowApp:
         voxeldlgbutton.set_on_clicked(self._on_voxeldlg_button)
 
         voxeledit_layout = gui.Horiz()
-        voxeledit_layout.add_child(gui.Label("Save Voxel files"))
+        voxeledit_layout.add_child(gui.Label("Load mesh files"))
         voxeledit_layout.add_child(self._voxeledit)
         voxeledit_layout.add_fixed(0.25 * em)
         voxeledit_layout.add_child(voxeldlgbutton)
