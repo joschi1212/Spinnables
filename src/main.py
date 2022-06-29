@@ -31,6 +31,8 @@ class WindowApp:
         self.wireframe_outer_mesh = None
         self.inner_mesh = None
         self.inner_voxels = None
+        self.inner_voxels_optimized_mystic = None
+        self.inner_voxels_optmized_scipy = None
         self.scale = False
         self.border_voxels = None
         self.inner_mesh_inertia = 0
@@ -174,31 +176,6 @@ class WindowApp:
             return 1
 
 # ----------------------------- inertia ------------------------------------
-
-    def calc_inertia(self, voxels, mass=0.1, l=0.25, CoM=[0,0,0]):
-        l = self.l
-        """
-        Calculates the moment of inertia for all voxels with respect to the up z axis [0, 0, 1]
-        Arguments:
-            voxels: List of 3D coordinates which represent the voxels center.
-            mass: Float - Mass of a single voxel, defaults to 0.1.
-            CoM: 3D coordinate - The center of mass of the object, defaults to coordinate origin
-        """
-
-        # calculate inertia of a single voxel in respect to its own axis:
-        voxel_inertia = 1.0/6.0 * mass * (l * l)
-
-        I = 0 # Inertia of the whole system
-
-        for center in voxels:
-            # The perpendicular distance between the voxel's z axis and the system's z axis
-            # is the xy distance from the voxel center to the CoM
-            x_diff = center[0] - CoM[0] 
-            y_diff = center[1] - CoM[1]
-            d_sq = x_diff**2 + y_diff**2
-            I += voxel_inertia + mass*d_sq
-        self.inner_mesh_inertia = I
-        print("Inertia of the system is: ", self.inner_mesh_inertia)
 
     def calc_vol_integrals(self):
         l3 = (self.l)**3
@@ -349,7 +326,6 @@ class WindowApp:
         #import pdb
         #pdb.set_trace()
         self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__grid__")
-        # self.calc_inertia(self.inner_voxels, l=l)self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__innerg__")
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
@@ -425,7 +401,6 @@ class WindowApp:
 
         # self.draw_voxels(grid_voxels)
         self.border_voxels = border_voxels
-        # self.calc_inertia(self.inner_voxels, l=l)
         self.draw_voxels(self.border_voxels, self.border_l, [0,0,0], "__borderg__")
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
@@ -619,6 +594,7 @@ class WindowApp:
                 self.fillings[i] = 1
 
         print(dens_distr)
+        print("----------------SCIPY OPTIMIZATION FINISHED ----------------")
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
     def optimize_mystic(self):
@@ -673,6 +649,8 @@ class WindowApp:
                     result[0] = 1
 
             self.myst_fillings = result[0]
+
+            print("----------------MYSTIC OPTIMIZATION FINISHED ----------------")
 
         except Exception as e:
             print(e)
@@ -761,6 +739,19 @@ class WindowApp:
         else:
             self.render_voxels(lns, colr, name = voxels_name)
 
+    def calc_optimized_voxels(self):
+        if self.inner_voxels_optmized_scipy is None:
+            self.inner_voxels_optmized_scipy = []
+            for idx, filling in enumerate(self.fillings):
+                if filling == 1:
+                    self.inner_voxels_optmized_scipy.append(self.inner_voxels[idx])
+
+        if self.inner_voxels_optimized_mystic is None:
+            self.inner_voxels_optimized_mystic = []
+            for idx, filling in enumerate(self.myst_fillings):
+                if filling == 1:
+                    self.inner_voxels_optimized_mystic.append(self.inner_voxels[idx])
+
 
     def save_voxel_data(self, inner_voxels, inner_sideLength, border_voxels, border_sideLength, meshName):
         """
@@ -781,6 +772,8 @@ class WindowApp:
             readme_path = os.path.normpath(dir_path + "/readme.txt")
             border_xyz_path = os.path.normpath(dir_path + "/border_xyz.txt")
             border_I_tensor_path = os.path.normpath(dir_path + "/border_I_tensor.txt")
+            inner_voxels_optimized_scipy_path = os.path.normpath(dir_path + "/inner_voxels_optimized_scipy.txt")
+            inner_voxels_optimized_mystic_path = os.path.normpath(dir_path + "/inner_voxels_optimized_mystic.txt")
 
             dir_exists = os.path.exists(dir_path)
             if(not dir_exists):
@@ -817,6 +810,21 @@ class WindowApp:
             else:
                 print("Save failed. border_inertia_tensor not available")
 
+            if(self.inner_voxels_optmized_scipy is not None):
+                np.savetxt(inner_voxels_optimized_scipy_path, np.array(self.inner_voxels_optmized_scipy))
+                print("inner_voxels_optimized_scipy saved!")
+                print(inner_voxels_optimized_scipy_path)
+            else:
+                print("Save failed. inner_voxels_optimized_scipy not available")
+
+            if(self.inner_voxels_optimized_mystic is not None):
+                np.savetxt(inner_voxels_optimized_mystic_path, self.inner_voxels_optimized_mystic)
+                print("inner_voxels_optimized_mystic saved!")
+                print(inner_voxels_optimized_mystic_path)
+            else:
+                print("Save failed. inner_voxels_optimized_mystic not available")
+
+
             with open(save_path, 'w') as file:
                 file.write(str(inner_sideLength) + "\n")
                 file.write(str(border_sideLength) + "\n")
@@ -824,6 +832,9 @@ class WindowApp:
                 if(self.border_voxels is not None): file.write(inner_path + "\n")
                 if(self.border_xyz is not None): file.write(border_xyz_path + "\n")
                 if(self.border_inertia_tensor is not None) : file.write(border_I_tensor_path + "\n")
+                if(self.inner_voxels_optmized_scipy is not None) : file.write(inner_voxels_optimized_scipy_path + "\n")
+                if(self.inner_voxels_optimized_mystic is not None) : file.write(inner_voxels_optimized_mystic_path + "\n")
+
 
             with open(readme_path, 'w') as file:
                 file.write("save file description: \nfirst line is inner voxel side length, second line is border voxel"
@@ -980,6 +991,8 @@ class WindowApp:
             self.optimize_mass_distr()
             print("---------------------mystic------------------------\n")
             self.optimize_mystic()
+
+            self.calc_optimized_voxels()
         except Exception as e:
             print(e)
 

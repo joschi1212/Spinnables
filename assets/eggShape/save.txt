@@ -2,3 +2,7 @@
 0.05
 assets\eggShape\border_vxls.txt
 assets\eggShape\inner_vxls.txt
+assets\eggShape\border_xyz.txt
+assets\eggShape\border_I_tensor.txt
+assets\eggShape\inner_voxels_optimized_scipy.txt
+assets\eggShape\inner_voxels_optimized_mystic.txt

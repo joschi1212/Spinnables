@@ -4,3 +4,5 @@
 venv3.9/
 venv*/
 *.bak
+
+*.blend1
