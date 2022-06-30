@@ -36,7 +36,7 @@ class WindowApp:
         self.scale = False
         self.border_voxels = None
         self.inner_mesh_inertia = 0
-        self.thickness = 0.5
+        self.thickness = 0.3
         self.max_triangles = 200
         self.l = 0.25 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
@@ -223,8 +223,10 @@ class WindowApp:
     
     # returns mass, z_com, and full inertia tensor:
     def calc_full_itensor(self, densities):
+        l3 = (self.l)**3
+        bl3 = (self.border_l)**3
         border_nb = np.shape(self.border_voxels)[0]
-        mass_total = border_nb + np.sum(densities)
+        mass_total = border_nb*bl3 + np.sum(densities)*l3
         diag110 = np.array([[1,0,0], [0,1,0], [0,0,0]])
         # get s_z = s_z border + s_z inner vox:
         s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T)
@@ -420,7 +422,7 @@ class WindowApp:
 
         grad_function = self.grad_f_top(densities, mass_total, z_com, full_itensor)
 
-        return (obj_function * 10, grad_function)
+        return (obj_function, grad_function)
         # return (obj_function, grad_function)
 
     def f_top1(self, densities):
@@ -439,9 +441,11 @@ class WindowApp:
     # x_com and y_com should be 0:
 
     def com_x(self, densities):
+        l3 = (self.l)**3
+        bl3 = (self.border_l)**3
         # border mass + inner voxels mass:
         border_nb = np.shape(self.border_voxels)[0]
-        mass_total =  border_nb + np.sum(densities)
+        mass_total =  bl3*border_nb + l3*np.sum(densities)
         s_x = self.border_xyz[0] + np.dot(densities, self.x_itgr.T)
         # get com:
         x_com = (1/mass_total)*s_x
@@ -449,24 +453,28 @@ class WindowApp:
         return x_com
 
     def lin_com_x(self):
+        l3 = (self.l)**3
+        bl3 = (self.border_l)**3
         dens_nb = np.shape(self.inner_voxels)[0]
         x_com = self.x_com
         full1 = np.full(dens_nb, 1)
         border_nb = np.shape(self.border_voxels)[0]
 
-        value = self.border_xyz[0] - x_com * border_nb
+        value = self.border_xyz[0] - x_com * border_nb * bl3
 
         dot_factor = self.x_itgr.T - x_com * full1.T
         
         return (dot_factor, value)
 
     def lin_com_y(self):
+        l3 = (self.l)**3
+        bl3 = (self.border_l)**3
         dens_nb = np.shape(self.inner_voxels)[0]
         y_com = self.y_com
         full1 = np.full(dens_nb, 1)
         border_nb = np.shape(self.border_voxels)[0]
 
-        value = self.border_xyz[1] - y_com * border_nb
+        value = self.border_xyz[1] - y_com * border_nb * bl3
 
         dot_factor = self.y_itgr.T - y_com * full1.T
         
@@ -483,9 +491,11 @@ class WindowApp:
         return (x_com, mass_total, s_x)
 
     def com_y(self, densities):
+        l3 = (self.l)**3
+        bl3 = (self.border_l)**3
         # border mass + inner voxels mass:
         border_nb = np.shape(self.border_voxels)[0]
-        mass_total =  border_nb + np.sum(densities)
+        mass_total =  bl3*border_nb + l3*np.sum(densities)
         s_y = self.border_xyz[1] + np.dot(densities, self.y_itgr.T)
         # get com:
         y_com = (1/mass_total)*s_y
@@ -493,9 +503,11 @@ class WindowApp:
         return y_com
     
     def com_z(self, densities):
+        l3 = (self.l)**3
+        bl3 = (self.border_l)**3
         # border mass + inner voxels mass:
         border_nb = np.shape(self.border_voxels)[0]
-        mass_total =  border_nb + np.sum(densities)
+        mass_total = bl3*border_nb + l3*np.sum(densities)
         s_z = self.border_xyz[2] + np.dot(densities, self.z_itgr.T)
         # get com:
         z_com = (1/mass_total)*s_z
@@ -580,8 +592,8 @@ class WindowApp:
         #import pdb
         #pdb.set_trace()
         print("start\n")
-        dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds, constraints = cons)
-        # dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', constraints = consx, options = {'maxiter': 10000})
+        # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds, constraints = cons)
+        dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'SLSQP', bounds = bds, constraints = cons, options = {'maxiter': 100000})
         # dens_distr = scipy.optimize.minimize(self.f_top1, densities0, method = 'trust-constr', bounds = bds, constraints = consx, options = {'maxiter': 10000})
         # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds)
         print("finish\n")
@@ -982,8 +994,8 @@ class WindowApp:
         self.create_border_grid()
 
     def _on_optimize_mass(self):
-        #import pdb
-        #pdb.set_trace()
+        import pdb
+        pdb.set_trace()
         try:
 
             self.calc_vol_integrals()
