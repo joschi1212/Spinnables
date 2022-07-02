@@ -265,11 +265,14 @@ class WindowApp:
         Arguments:
             l: The side length of the voxel
         """
-        in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
+        # in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
+        in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.outer_mesh)
         inside_voxels = []
+        border_voxels = []
         grid_voxels = []
         print('generate mesh bb')
-        bd_box = self.inner_mesh.get_axis_aligned_bounding_box()
+        bd_box = self.outer_mesh.get_axis_aligned_bounding_box()
+        #bd_box = self.inner_mesh.get_axis_aligned_bounding_box()
         print("worked")
         box_pts = bd_box.get_box_points()
         #import pdb
@@ -285,6 +288,7 @@ class WindowApp:
         z = z_min
         cell_count = 0
         inside_count = 0
+        border_count = 0
 
         while(x <= x_max):
             print(x)
@@ -296,6 +300,7 @@ class WindowApp:
                     # grid_voxels.append(center)
                     cell_verts = []
                     cell_inside = 1
+                    verts_out = 0
                     # generate cell vertices:
                     for dx in [-l/2, l/2]:
                         for dy in [-l/2, l/2]:
@@ -305,8 +310,9 @@ class WindowApp:
                                 # for each cell vertex, check whether it's inside or outside the mesh:
                                 inside = self.ray_shoot_inside(in_mesh, vert)
                                 if(not(inside)):
+                                    verts_out +=1
                                     cell_inside = 0
-                                    break;
+                                    #break;
                     #if(cell_count == 0):
                     #    print(cell_verts)
                     #    print(self.ray_shoot_inside(self.inner_mesh, vert))
@@ -318,95 +324,101 @@ class WindowApp:
                     if(cell_inside):
                         inside_count +=1
                         inside_voxels.append(center)
+                    elif(verts_out < 8):
+                        border_count +=1
+                        border_voxels.append(center)
+                    print(f"{x}, {y}, {z}, {cell_inside}, {verts_out}\n")
                     z += l
                     cell_count +=1
                 y += l
             x += l
 
-        
         self.inner_voxels = inside_voxels
+        self.border_voxels = border_voxels
         #import pdb
         #pdb.set_trace()
         self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__grid__")
         # print("inner voxels: ", self.inner_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
+        print("number of border cells:", border_count)
 
     def create_border_grid(self, l=0.25):
 
-        l = self.border_l
-        out_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.outer_mesh)
-        in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
-        border_voxels = []
-        grid_voxels = []
-        print('generate mesh bb')
-        bd_box = self.outer_mesh.get_axis_aligned_bounding_box()
-        print("worked")
-        box_pts = bd_box.get_box_points()
-        #import pdb
-        #pdb.set_trace()
-        min_pt = bd_box.get_min_bound()
-        max_pt = bd_box.get_max_bound()
-        print('bd_box min, max: ', min_pt, max_pt)
+        #l = self.border_l
+        #out_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.outer_mesh)
+        #in_mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.inner_mesh)
+        #border_voxels = []
+        #grid_voxels = []
+        #print('generate mesh bb')
+        #bd_box = self.outer_mesh.get_axis_aligned_bounding_box()
+        #print("worked")
+        #box_pts = bd_box.get_box_points()
+        ##import pdb
+        ##pdb.set_trace()
+        #min_pt = bd_box.get_min_bound()
+        #max_pt = bd_box.get_max_bound()
+        #print('bd_box min, max: ', min_pt, max_pt)
         
-        x_min, y_min, z_min = min_pt
-        x_max, y_max, z_max = max_pt
-        x = x_min
-        y = y_min
-        z = z_min
-        cell_count = 0
-        border_count = 0
+        #x_min, y_min, z_min = min_pt
+        #x_max, y_max, z_max = max_pt
+        #x = x_min
+        #y = y_min
+        #z = z_min
+        #cell_count = 0
+        #border_count = 0
 
-        while(x <= x_max):
-            print(x)
-            #import pdb
-            #pdb.set_trace()
-            y = y_min
-            while(y <= y_max):
-                z = z_min
-                while(z <= z_max):
-                    center = np.array([x,y,z])
-                    # grid_voxels.append(center)
-                    cell_verts = []
-                    cell_border = 1
-                    # generate cell vertices:
-                    for dx in [-l/2, l/2]:
-                        for dy in [-l/2, l/2]:
-                            for dz in [-l/2, l/2]:
-                                vert = np.array([x+dx, y+dy, z+dz])
-                                cell_verts.append(vert)
-                                # for each cell, vertex, check if it's inside the outer mesh:
-                                inside = self.ray_shoot_inside(out_mesh, vert)
-                                if(not(inside)):
-                                    cell_border = 0
-                                    break;
-                                # for each cell vertex, check whether it's outside the inner mesh:
-                                inside = self.ray_shoot_inside(in_mesh, vert)
-                                if(inside):
-                                    cell_border = 0
-                                    break;
-                    #if(cell_count == 0):
-                    #    print(cell_verts)
-                    #    print(self.ray_shoot_inside(self.inner_mesh, vert))
-                        #self.draw_voxel(center)
+        #while(x <= x_max):
+        #    print(x)
+        #    #import pdb
+        #    #pdb.set_trace()
+        #    y = y_min
+        #    while(y <= y_max):
+        #        z = z_min
+        #        while(z <= z_max):
+        #            center = np.array([x,y,z])
+        #            # grid_voxels.append(center)
+        #            cell_verts = []
+        #            cell_border = 1
+        #            # generate cell vertices:
+        #            for dx in [-l/2, l/2]:
+        #                for dy in [-l/2, l/2]:
+        #                    for dz in [-l/2, l/2]:
+        #                        vert = np.array([x+dx, y+dy, z+dz])
+        #                        cell_verts.append(vert)
+        #                        # for each cell, vertex, check if it's inside the outer mesh:
+        #                        inside = self.ray_shoot_inside(out_mesh, vert)
+        #                        if(not(inside)):
+        #                            cell_border = 0
+        #                            break;
+        #                        # for each cell vertex, check whether it's outside the inner mesh:
+        #                        inside = self.ray_shoot_inside(in_mesh, vert)
+        #                        if(inside):
+        #                            cell_border = 0
+        #                            break;
+        #            #if(cell_count == 0):
+        #            #    print(cell_verts)
+        #            #    print(self.ray_shoot_inside(self.inner_mesh, vert))
+        #                #self.draw_voxel(center)
                     
-                    #import pdb
-                    #pdb.set_trace()    
-                    grid_voxels.append(center)
-                    if(cell_border):
-                        border_count +=1
-                        border_voxels.append(center)
-                    z += l
-                    cell_count +=1
-                y += l
-            x += l
+        #            #import pdb
+        #            #pdb.set_trace()    
+        #            grid_voxels.append(center)
+        #            if(cell_border):
+        #                border_count +=1
+        #                border_voxels.append(center)
+        #            z += l
+        #            cell_count +=1
+        #        y += l
+        #    x += l
 
-        # self.draw_voxels(grid_voxels)
-        self.border_voxels = border_voxels
-        self.draw_voxels(self.border_voxels, self.border_l, [0,0,0], "__borderg__")
-        # print("inner voxels: ", self.inner_voxels)
-        print("number of grid cells:", cell_count)
-        print("number of BORDER cells:", border_count)
+        ## self.draw_voxels(grid_voxels)
+        #self.border_voxels = border_voxels
+        #self.draw_voxels(self.border_voxels, self.border_l, [0,0,0], "__borderg__")
+        self.draw_voxels(self.border_voxels, self.l, [0,0,0], "__borderg__")
+        ## print("inner voxels: ", self.inner_voxels)
+        #print("number of grid cells:", cell_count)
+        #print("number of BORDER cells:", border_count)
         return
 
 # ----------------------------- optimization ------------------------------------
