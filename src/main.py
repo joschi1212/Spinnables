@@ -38,7 +38,7 @@ class WindowApp:
         self.inner_mesh_inertia = 0
         self.thickness = 0.3
         self.max_triangles = 200
-        self.l = 0.25 # side length of single inner voxel.
+        self.l = 0.15 # side length of single inner voxel.
         self.border_l = 0.25 #side length of single border voxel.
         self.density = 1
         self.fillings = None
@@ -611,15 +611,22 @@ class WindowApp:
         print("finish\n")
         self.fillings = dens_distr.x
         print(self.fillings)
+        full_voxels = []
 
         for i, fill in enumerate(self.fillings):
             if(fill<0.50):
                 self.fillings[i] = 0
             else:
                 self.fillings[i] = 1
+                full_voxels.append(self.inner_voxels[i])
 
         print(dens_distr)
         print("----------------SCIPY OPTIMIZATION FINISHED ----------------")
+
+        
+        #draw optimize fillings:
+        self.draw_voxels(full_voxels, self.l, [1, 0, 0], "_ful_vox_")
+
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
     def optimize_mystic(self):
@@ -676,6 +683,7 @@ class WindowApp:
             self.myst_fillings = result[0]
 
             print("----------------MYSTIC OPTIMIZATION FINISHED ----------------")
+
 
         except Exception as e:
             print(e)
@@ -1006,8 +1014,8 @@ class WindowApp:
         self.create_border_grid()
 
     def _on_optimize_mass(self):
-        import pdb
-        pdb.set_trace()
+        #import pdb
+        #pdb.set_trace()
         try:
 
             self.calc_vol_integrals()
