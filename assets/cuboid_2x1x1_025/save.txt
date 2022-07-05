@@ -1,0 +1,8 @@
+0.25
+0.25
+assets\cuboid_2x1x1_025\border_vxls.txt
+assets\cuboid_2x1x1_025\inner_vxls.txt
+assets\cuboid_2x1x1_025\border_xyz.txt
+assets\cuboid_2x1x1_025\border_I_tensor.txt
+assets\cuboid_2x1x1_025\inner_voxels_optimized_scipy.txt
+assets\cuboid_2x1x1_025\inner_voxels_optimized_mystic.txt
