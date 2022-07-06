@@ -34,14 +34,17 @@ class WindowApp:
         self.inner_voxels_optimized_mystic = None
         self.inner_voxels_optmized_scipy = None
         self.scale = False
+        self.scale = False
         self.border_voxels = None
         self.inner_mesh_inertia = 0
         self.thickness = 0.3
         self.max_triangles = 200
-        self.l = 0.15 # side length of single inner voxel.
-        self.border_l = 0.25 #side length of single border voxel.
+        self.l = 0.2 # side length of single inner voxel.
+        self.grid_l = 0.2
+        self.border_l = 0.2 #side length of single border voxel.
         self.density = 1
         self.fillings = None
+        self.true_fillings = None
         self.myst_fillings = None
 
         # inertia volume integrals for voxels:
@@ -62,7 +65,7 @@ class WindowApp:
         self.bd_functions = []
 
         # gammas (weights for the center of mass term and the inertia term):
-        self.weight_c = 0.5
+        self.weight_c = 0.0
         self.weight_i = 0.5
         self.x_com = 0.0
         self.y_com = 0.0
@@ -196,7 +199,8 @@ class WindowApp:
 
     def calc_border_itensor(self):
         self.border_xyz = np.zeros(3)
-        self.border_inertia_tensor = np.zeros((3,3))
+        # self.border_inertia_tensor = np.zeros((3,3))
+        self.border_inertia_tensor = np.full((3,3), 0.0)
         bl3 = (self.border_l)**3
         bl5_12 = ((self.border_l)**5)/12
         for b_vox in self.border_voxels:
@@ -237,7 +241,7 @@ class WindowApp:
         # com_xyz = (1/mass_total)*np.array([s_z, s_y, s_y]).T
 
             
-        full_itensor = np.zeros((3,3))
+        full_itensor = np.full((3,3), 0.0)
         full_itensor[0][0] = np.dot(densities, (self.y2_itgr + self.z2_itgr).T)
         full_itensor[1][1] = np.dot(densities, (self.x2_itgr + self.z2_itgr).T)
         full_itensor[2][2] = np.dot(densities, (self.x2_itgr + self.y2_itgr).T)
@@ -254,9 +258,35 @@ class WindowApp:
         return mass_total, z_com, full_itensor
 
 # ----------------------------- eof inertia ------------------------------------
+    def points_on_face(self, p1, p2, p3, p4):
+        side = self.l
+        if(np.absolute(p1[0] - p2[0]) < side/2 and np.absolute(p2[0] - p3[0]) < side/2 and np.absolute(p3[0] - p4[0]) < side/2):
+            return 1;
+        if(np.absolute(p1[1] - p2[1]) < side/2 and np.absolute(p2[1] - p3[1]) < side/2 and np.absolute(p3[1] - p4[1]) < side/2):
+            return 1;
+        if(np.absolute(p1[2] - p2[2]) < side/2 and np.absolute(p2[2] - p3[2]) < side/2 and np.absolute(p3[2] - p4[2]) < side/2):
+            return 1;
+        return 0;
 
-    def create_grid(self, l=0.25):
-        l = self.l
+    def create_grid(self, l=1):
+        self.l = 1.0
+        self.border_l = 1.0
+        self.grid_l = 1.0
+        self.border_voxels = []
+        self.inner_voxels = []
+        for x in range(-5, 6):
+            for y in range(-5, 6):
+                for z in range(1, 11):
+                    if(np.absolute(x) == 5 or np.absolute(y) == 5 or z==1 or z==10):
+                        self.border_voxels.append(np.array([x, y, z]))
+                    else:
+                        self.inner_voxels.append(np.array([x, y, z]))
+
+        self.draw_voxels(self.inner_voxels, self.grid_l, [1,0,0], "__grid__")
+
+
+    def create_grid1(self, l=0.25):
+        l = self.grid_l
         """
         Creates a grid, which is a list of 3D coordinates representing the center of a cell.
         Also performs a inside test via rayshooting technique that checks for each cell if it is entirely inside
@@ -301,6 +331,7 @@ class WindowApp:
                     cell_verts = []
                     cell_inside = 1
                     verts_out = 0
+                    pos_out = []
                     # generate cell vertices:
                     for dx in [-l/2, l/2]:
                         for dy in [-l/2, l/2]:
@@ -311,6 +342,7 @@ class WindowApp:
                                 inside = self.ray_shoot_inside(in_mesh, vert)
                                 if(not(inside)):
                                     verts_out +=1
+                                    pos_out.append(vert)
                                     cell_inside = 0
                                     #break;
                     #if(cell_count == 0):
@@ -319,12 +351,15 @@ class WindowApp:
                         #self.draw_voxel(center)
                     
                     #import pdb
-                    #pdb.set_trace()    
+                    #pdb.set_trace()
                     grid_voxels.append(center)
                     if(cell_inside):
+                        print("inside")
                         inside_count +=1
                         inside_voxels.append(center)
-                    elif(verts_out < 8):
+                    # border cells need to have some outside verts, but also at least a face in)
+                    elif(verts_out < 3 or (verts_out == 3 and self.points_on_face(pos_out[0], pos_out[1], pos_out[2], pos_out[0])) or (verts_out == 4 and self.points_on_face(pos_out[0], pos_out[1], pos_out[2], pos_out[3]))):
+                        print("border")
                         border_count +=1
                         border_voxels.append(center)
                     print(f"{x}, {y}, {z}, {cell_inside}, {verts_out}\n")
@@ -337,8 +372,9 @@ class WindowApp:
         self.border_voxels = border_voxels
         #import pdb
         #pdb.set_trace()
-        self.draw_voxels(self.inner_voxels, self.l, [1,0,0], "__grid__")
-        # print("inner voxels: ", self.inner_voxels)
+        self.draw_voxels(self.inner_voxels, self.grid_l, [1,0,0], "__grid__")
+        print("inner voxels: ", self.inner_voxels)
+        print("border voxels: ", self.border_voxels)
         print("number of grid cells:", cell_count)
         print("number of inside cells:", inside_count)
         print("number of border cells:", border_count)
@@ -472,9 +508,9 @@ class WindowApp:
         full1 = np.full(dens_nb, 1)
         border_nb = np.shape(self.border_voxels)[0]
 
-        value = self.border_xyz[0] - x_com * border_nb * bl3
+        value = - self.border_xyz[0] + x_com * border_nb * bl3
 
-        dot_factor = self.x_itgr.T - x_com * full1.T
+        dot_factor = self.x_itgr.T - x_com * full1.T *l3
         
         return (dot_factor, value)
 
@@ -486,9 +522,9 @@ class WindowApp:
         full1 = np.full(dens_nb, 1)
         border_nb = np.shape(self.border_voxels)[0]
 
-        value = self.border_xyz[1] - y_com * border_nb * bl3
+        value = - self.border_xyz[1] + y_com * border_nb * bl3
 
-        dot_factor = self.y_itgr.T - y_com * full1.T
+        dot_factor = self.y_itgr.T - y_com * full1.T * l3
         
         return (dot_factor, value)
 
@@ -555,7 +591,8 @@ class WindowApp:
         # cof1 = 2g_c*s_z,      cof2 = 2g_i*A2_xy^2
         cof1 = 2*self.weight_c*s_z
         cof2 = 2*self.weight_i*(full_itensor[2][2])**2
-        cof3 = 2*self.weight_i * ((full_itensor[0][0])**2 + (full_itensor[0][1])**2 + (full_itensor[1][1])**2) * (full_itensor[2][2])
+        #cof3 = 2*self.weight_i * ((full_itensor[0][0])**2 + (full_itensor[0][1])**2 + (full_itensor[1][1])**2) * (full_itensor[2][2])
+        cof3 = 2*self.weight_i * ((full_itensor[0][0])**2 + 2*(full_itensor[0][1])**2 + (full_itensor[1][1])**2) * (full_itensor[2][2])
         cof4 = (full_itensor[2][2])**4
 
         for vi, vox in enumerate(self.inner_voxels):
@@ -566,7 +603,7 @@ class WindowApp:
             kxy = self.xy_itgr[vi]
 
             grad_i = cof1*kz
-            grad_i += (1/cof4)*cof2*( full_itensor[0][0]*(ky2z2 - 2*z_com*kz) + full_itensor[0][1]*kxy + full_itensor[1][1]*(kx2z2 - 2*z_com*kz) )
+            grad_i += (1/cof4)*cof2*( full_itensor[0][0]*(ky2z2 - 2*z_com*kz + self.l*z_com**2) + 2*full_itensor[0][1]*kxy + full_itensor[1][1]*(kx2z2 - 2*z_com*kz + self.l*z_com**2) )
             grad_i -= (1/cof4)*(cof3*kx2y2)
 
             top_grad[vi] = grad_i
@@ -600,7 +637,7 @@ class WindowApp:
         up_bd = np.full(cell_nb, 1.0)
         bds = scipy.optimize.Bounds(low_bd, up_bd)
 
-        densities0 = np.full(cell_nb, 0.5)
+        densities0 = np.full(cell_nb, 1.0)
         #import pdb
         #pdb.set_trace()
         print("start\n")
@@ -610,6 +647,7 @@ class WindowApp:
         # dens_distr = scipy.optimize.minimize(self.f_top, densities0, method = 'SLSQP', jac = True, bounds = bds)
         print("finish\n")
         self.fillings = dens_distr.x
+        self.true_fillings = self.fillings
         print(self.fillings)
         full_voxels = []
 
@@ -625,11 +663,14 @@ class WindowApp:
 
         
         #draw optimize fillings:
-        self.draw_voxels(full_voxels, self.l, [1, 0, 0], "_ful_vox_")
+        self.draw_voxels(full_voxels, self.grid_l, [1, 0, 0], "_ful_vox_")
+        print("border vox: \n", self.border_voxels, '\n')
+        print("full voxels: \n", full_voxels, "\n")
 
         #print(self.cmx(self.fillings), self.com_y(self.fillings))
 
     def optimize_mystic(self):
+        return
         try:
             cell_nb = np.shape(self.inner_voxels)[0]
             dens0 = [1.0 for i in range(0, cell_nb)]
@@ -695,7 +736,7 @@ class WindowApp:
     def check_fin_dif(self):
         cel_nb = np.shape(self.inner_voxels)[0]
         dens = np.full(cel_nb, 0.5)
-        dif = 0.001
+        dif = 0.01
         grad_f = self.f_top(dens)[1]
         # central difference:
         for i, d in enumerate(dens):
@@ -721,6 +762,7 @@ class WindowApp:
             l: The side length of a single voxel
             voxels_name: Name of the voxels mesh
         """
+        print("draw", len(cells), "voxels")
         if(not len(cells)):
             return
         v0 = 0
@@ -733,7 +775,7 @@ class WindowApp:
         v7 = 7
         points = np.zeros(3)
         lines_matr = []
-
+        print("draw voxels \n")
         for center in cells:
             x, y, z = center
             # print(x, y, z, "coords")
@@ -1014,6 +1056,10 @@ class WindowApp:
         self.create_border_grid()
 
     def _on_optimize_mass(self):
+        # self.border_voxels = []
+
+        cell_nb = np.shape(self.inner_voxels)[0]
+        dens0 = np.full(cell_nb, 1.0)
         #import pdb
         #pdb.set_trace()
         try:
@@ -1022,14 +1068,41 @@ class WindowApp:
             if((self.border_inertia_tensor is None) and (self.border_xyz is None)):
                 self.calc_border_itensor()
 
+            itensor = self.calc_full_itensor(dens0)[2]
+            fyo = (itensor[0][0]**2 + itensor[1][1]**2 + 2*itensor[0][1]**2)/(itensor[2][2]**2) 
+            print("border itensor: \n", self.calc_full_itensor(dens0), "\n com x, y, z: \n")
+            print("f yo yo : \n", fyo)
+            print("\n x com:", self.com_x(dens0))
+            print("\n y com:", self.com_y(dens0))
+            print("\n z com:", self.com_z(dens0))
+            print("\n x parallel:", self.spin_parallel_x(dens0))
+            print("\n y parallel:", self.spin_parallel_y(dens0))
+            print("\n")
+
+            print("checking fin dif \n")
+            # self.check_fin_dif()
+
+
             self.optimize_mass_distr()
             
-            want_mystic = input('Should mystic run for you?')
-            if (want_mystic == 'y'):
-                print("---------------------mystic------------------------\n")
-                self.optimize_mystic()
+            #want_mystic = input('Should mystic run for you?')
+            #if (want_mystic == 'y'):
+            #    print("---------------------mystic------------------------\n")
+            #    self.optimize_mystic()
 
-            self.calc_optimized_voxels()
+            # self.calc_optimized_voxels()
+            #import pdb
+            #pdb.set_trace()
+            itensor = self.calc_full_itensor(self.fillings)[2]
+            fyo = (itensor[0][0]**2 + itensor[1][1]**2 + 2*itensor[0][1]**2)/(itensor[2][2]**2) 
+            print("border itensor: \n", self.calc_full_itensor(self.fillings), "\n com x, y, z: \n")
+            print("f yo yo : \n", fyo)
+            print("\n x com:", self.com_x(self.fillings))
+            print("\n y com:", self.com_y(self.fillings))
+            print("\n z com:", self.com_z(self.fillings))
+            print("\n x parallel:", self.spin_parallel_x(self.fillings))
+            print("\n y parallel:", self.spin_parallel_y(self.fillings))
+            print("\n")
         except Exception as e:
             print(e)
 
