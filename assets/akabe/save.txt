@@ -1,5 +1,5 @@
 0.2
-0.2
+0.1
 assets\akabe\border_vxls.txt
 assets\akabe\inner_vxls.txt
 assets\akabe\border_xyz.txt

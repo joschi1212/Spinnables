@@ -1,5 +1,4 @@
-0.1
-0.05
+0.15
 assets\sphere\border_vxls.txt
 assets\sphere\inner_vxls.txt
 assets\sphere\border_xyz.txt
