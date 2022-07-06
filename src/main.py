@@ -274,6 +274,7 @@ class WindowApp:
         self.grid_l = 1.0
         self.border_voxels = []
         self.inner_voxels = []
+        self.model_name = "__test_cube__"
         for x in range(-5, 6):
             for y in range(-5, 6):
                 for z in range(1, 11):
@@ -818,13 +819,13 @@ class WindowApp:
         if self.inner_voxels_optmized_scipy is None:
             self.inner_voxels_optmized_scipy = []
             for idx, filling in enumerate(self.fillings):
-                if filling == 0:
+                if filling == 1:
                     self.inner_voxels_optmized_scipy.append(self.inner_voxels[idx])
 
         if self.inner_voxels_optimized_mystic is None:
             self.inner_voxels_optimized_mystic = []
             for idx, filling in enumerate(self.myst_fillings):
-                if filling == 0:
+                if filling == 1:
                     self.inner_voxels_optimized_mystic.append(self.inner_voxels[idx])
 
 
@@ -1038,7 +1039,7 @@ class WindowApp:
         self.window.close_dialog()
 
     def _on_voxel_size_changed(self, new_size):
-        self.l = float(new_size)
+        self.grid_l = float(new_size)
 
     def _on_thickness_changed(self, new_thickness):
         self.thickness = float(new_thickness)
@@ -1050,7 +1051,7 @@ class WindowApp:
         self.border_l = float(new_size)
 
     def _on_create_grid(self):
-        self.create_grid()
+        self.create_grid1()
 
     def _on_create_border_grid(self):
         self.create_border_grid()
@@ -1090,7 +1091,7 @@ class WindowApp:
             #    print("---------------------mystic------------------------\n")
             #    self.optimize_mystic()
 
-            # self.calc_optimized_voxels()
+            self.calc_optimized_voxels()
             #import pdb
             #pdb.set_trace()
             itensor = self.calc_full_itensor(self.fillings)[2]

@@ -1,5 +1,5 @@
-0.1
-0.05
+0.2
+0.2
 assets\horiz_elipsoid\border_vxls.txt
 assets\horiz_elipsoid\inner_vxls.txt
 assets\horiz_elipsoid\border_xyz.txt
