@@ -32,7 +32,9 @@ class WindowApp:
         self.inner_mesh = None
         self.inner_voxels = None
         self.inner_voxels_optimized_mystic = None
-        self.inner_voxels_optmized_scipy = None
+        self.filled_voxels_optimized_scipy = None
+        self.inner_voxels_optimized_scipy = None
+        self.filled_voxels_optimized_mystic = None
         self.scale = False
         self.scale = False
         self.border_voxels = None
@@ -818,15 +820,21 @@ class WindowApp:
     def calc_optimized_voxels(self):
         if self.inner_voxels_optmized_scipy is None:
             self.inner_voxels_optmized_scipy = []
+            self.filled_voxels_optimized_scipy = []
             for idx, filling in enumerate(self.fillings):
-                if filling == 1:
+                if filling == 0:
                     self.inner_voxels_optmized_scipy.append(self.inner_voxels[idx])
+                else:
+                    self.filled_voxels_optimized_scipy.append(self.inner_voxels[idx])
 
         if self.inner_voxels_optimized_mystic is None:
             self.inner_voxels_optimized_mystic = []
+            self.filled_voxels_optimized_mystic = []
             for idx, filling in enumerate(self.myst_fillings):
-                if filling == 1:
+                if filling == 0:
                     self.inner_voxels_optimized_mystic.append(self.inner_voxels[idx])
+                else:
+                    self.filled_voxels_optimized_mystic.append(self.inner_voxels[idx])
 
 
     def save_voxel_data(self, inner_voxels, inner_sideLength, border_voxels, border_sideLength, meshName):
@@ -849,7 +857,9 @@ class WindowApp:
             border_xyz_path = os.path.normpath(dir_path + "/border_xyz.txt")
             border_I_tensor_path = os.path.normpath(dir_path + "/border_I_tensor.txt")
             inner_voxels_optimized_scipy_path = os.path.normpath(dir_path + "/inner_voxels_optimized_scipy.txt")
+            filled_voxels_optimized_scipy_path = os.path.normpath(dir_paht + "/filled_voxels_optimized_scipy.txt")
             inner_voxels_optimized_mystic_path = os.path.normpath(dir_path + "/inner_voxels_optimized_mystic.txt")
+            filled_voxels_optimized_mystic_path = os.path.normpath(dir_paht + "/filled_voxels_optimized_mystic.txt")
 
             dir_exists = os.path.exists(dir_path)
             if(not dir_exists):
@@ -893,10 +903,24 @@ class WindowApp:
             else:
                 print("Save failed. inner_voxels_optimized_scipy not available")
 
+            if (self.filled_voxels_optmized_scipy is not None):
+                np.savetxt(filled_voxels_optimized_scipy_path, np.array(self.filled_voxels_optmized_scipy))
+                print("filled_voxels_optimized_scipy saved!")
+                print(filled_voxels_optimized_scipy_path)
+            else:
+                print("Save failed. inner_voxels_optimized_scipy not available")
+
             if(self.inner_voxels_optimized_mystic is not None):
                 np.savetxt(inner_voxels_optimized_mystic_path, self.inner_voxels_optimized_mystic)
                 print("inner_voxels_optimized_mystic saved!")
                 print(inner_voxels_optimized_mystic_path)
+            else:
+                print("Save failed. inner_voxels_optimized_mystic not available")
+
+            if (self.filled_voxels_optmized_mystic is not None):
+                np.savetxt(filled_voxels_optimized_mystic_path, np.array(self.filled_voxels_optmized_mystic))
+                print("filled_voxels_optimized_mystic saved!")
+                print(filled_voxels_optimized_mystic_path)
             else:
                 print("Save failed. inner_voxels_optimized_mystic not available")
 

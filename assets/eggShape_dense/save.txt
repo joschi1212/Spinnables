@@ -1,4 +1,0 @@
-0.05
-0.05
-assets\eggShape\border_vxls.txt
-assets\eggShape\inner_vxls.txt
