@@ -857,9 +857,9 @@ class WindowApp:
             border_xyz_path = os.path.normpath(dir_path + "/border_xyz.txt")
             border_I_tensor_path = os.path.normpath(dir_path + "/border_I_tensor.txt")
             inner_voxels_optimized_scipy_path = os.path.normpath(dir_path + "/inner_voxels_optimized_scipy.txt")
-            filled_voxels_optimized_scipy_path = os.path.normpath(dir_paht + "/filled_voxels_optimized_scipy.txt")
+            filled_voxels_optimized_scipy_path = os.path.normpath(dir_path + "/filled_voxels_optimized_scipy.txt")
             inner_voxels_optimized_mystic_path = os.path.normpath(dir_path + "/inner_voxels_optimized_mystic.txt")
-            filled_voxels_optimized_mystic_path = os.path.normpath(dir_paht + "/filled_voxels_optimized_mystic.txt")
+            filled_voxels_optimized_mystic_path = os.path.normpath(dir_path + "/filled_voxels_optimized_mystic.txt")
 
             dir_exists = os.path.exists(dir_path)
             if(not dir_exists):

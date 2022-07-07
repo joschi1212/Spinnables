@@ -1,8 +1,0 @@
-0.2
-0.2
-assets\horiz_elipsoid\border_vxls.txt
-assets\horiz_elipsoid\inner_vxls.txt
-assets\horiz_elipsoid\border_xyz.txt
-assets\horiz_elipsoid\border_I_tensor.txt
-assets\horiz_elipsoid\inner_voxels_optimized_scipy.txt
-assets\horiz_elipsoid\inner_voxels_optimized_mystic.txt
