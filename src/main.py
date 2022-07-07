@@ -903,12 +903,12 @@ class WindowApp:
             else:
                 print("Save failed. inner_voxels_optimized_scipy not available")
 
-            if (self.filled_voxels_optmized_scipy is not None):
-                np.savetxt(filled_voxels_optimized_scipy_path, np.array(self.filled_voxels_optmized_scipy))
+            if (self.filled_voxels_optimized_scipy is not None):
+                np.savetxt(filled_voxels_optimized_scipy_path, np.array(self.filled_voxels_optimized_scipy))
                 print("filled_voxels_optimized_scipy saved!")
                 print(filled_voxels_optimized_scipy_path)
             else:
-                print("Save failed. inner_voxels_optimized_scipy not available")
+                print("Save failed. filled_voxels_optimized_scipy not available")
 
             if(self.inner_voxels_optimized_mystic is not None):
                 np.savetxt(inner_voxels_optimized_mystic_path, self.inner_voxels_optimized_mystic)
@@ -917,12 +917,12 @@ class WindowApp:
             else:
                 print("Save failed. inner_voxels_optimized_mystic not available")
 
-            if (self.filled_voxels_optmized_mystic is not None):
-                np.savetxt(filled_voxels_optimized_mystic_path, np.array(self.filled_voxels_optmized_mystic))
+            if (self.filled_voxels_optimized_mystic is not None):
+                np.savetxt(filled_voxels_optimized_mystic_path, np.array(self.filled_voxels_optimized_mystic))
                 print("filled_voxels_optimized_mystic saved!")
                 print(filled_voxels_optimized_mystic_path)
             else:
-                print("Save failed. inner_voxels_optimized_mystic not available")
+                print("Save failed. filled_voxels_optimized_mystic not available")
 
 
             with open(save_path, 'w') as file:
